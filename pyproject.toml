@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "receive-bluetooth-data"
+version = "0.1.0"
+description = "Program that receives data via bluetooth from embedded device and writes to file location"
+authors = ["Patrick Walsh <pw4.2020@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
