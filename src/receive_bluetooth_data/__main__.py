@@ -7,7 +7,11 @@ Notes
 -----
 The format of the incoming bluetooth data is a string of comma separated
 values as:
-<l_shank_x>,<l_shank_y>,<l_shank_z>,<l_thigh_x>,<l_thigh_y>,<l_thigh_z>
+    <l_shank_x>,<l_shank_y>,<l_shank_z>,<l_thigh_x>,<l_thigh_y>,<l_thigh_z>
+
+and data is saved in the .run file as:
+    l_shank_x,l_shank_y,l_shank_z,l_thigh_x,l_thigh_y,l_thigh_z,r_shank_x,r_shank_y,r_shank_z,r_thigh_x,r_thigh_y,r_thigh_z
+
 """
 import sys
 import os
@@ -74,7 +78,13 @@ def create_run_file() -> TextIO:
 
 
 async def main(address):
-    # discover all possible connections
+    """main function for receiving bluetooth data from ESP32
+
+    Parameters
+    ----------
+    address: str
+        address of bluetooth device
+    """
     async with BleakClient(address) as client:
         # read data from bluetooth
         try:
@@ -105,6 +115,7 @@ async def main(address):
                 # give time for program to send more packets
                 time.sleep(round(1 / SAMPLES_PER_SECOND))
         finally:
+            # closing the file when the program is complete or an error occurs
             file.close()
 
 
