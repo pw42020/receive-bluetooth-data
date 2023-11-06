@@ -1,0 +1,14 @@
+syntax = "proto2";
+
+message LegData {
+    message coordinates {
+        required float x = 1;
+        required float y = 2;
+        required float z = 3;
+    }
+
+    required coordinates right_shank = 1;
+    required coordinates left_shank = 2;
+    required coordinates right_thigh = 3;
+    required coordinates left_thigh = 4;
+}
