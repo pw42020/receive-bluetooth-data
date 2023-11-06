@@ -2,6 +2,12 @@
 SDP Team 1
 Author: Patrick Walsh
 Python main program for receiving bluetooth data from ESP32.
+
+Notes
+-----
+The format of the incoming bluetooth data is a string of comma separated
+values as:
+<l_shank_x>,<l_shank_y>,<l_shank_z>,<l_thigh_x>,<l_thigh_y>,<l_thigh_z>
 """
 import sys
 import os
@@ -9,8 +15,10 @@ import time
 from pathlib import Path
 import asyncio
 import logging
-from bleak import BleakClient, BleakScanner
-from typing import Final
+from datetime import datetime
+from typing import Final, TextIO
+
+from bleak import BleakClient
 
 # add assets directory to the path
 sys.path.append(str(Path(os.path.dirname(__file__)).parent.parent / "assets"))
@@ -38,25 +46,67 @@ log.addHandler(ch)
 # global variables
 NAME = "ESP32"
 CHANNEL_NAME = "C2431FC1-6A48-D48C-FEBA-7AA454D2B165"
-CHARACTERISTIC_ID = "beb5483e-36e1-4688-b7f5-ea07361b26a8"
+LEFT_LEG_ID = "beb5483e-36e1-4688-b7f5-ea07361b26a8"
+RIGHT_LEG_ID = "797e275d-3583-4403-8815-0e56a47ed5fa"
 
-FREQUENCY: Final[float] = 1 / 15  # 15 Hz
+SAMPLES_PER_SECOND: Final[int] = 15
+
+RUN_FOLDER_LOCATION: Final[Path] = Path(os.path.dirname(__file__)).parent.parent
+
+
+def create_run_file() -> TextIO:
+    """create current session with user of their run into currently
+    hardcoded .run file that will act as a CSV
+
+    Notes
+    -----
+    The file in specific will stay encoded inside of the .run in utf-8"""
+    run_folder: Final[str] = str(RUN_FOLDER_LOCATION / "runs")
+    if not os.path.exists(run_folder):
+        os.mkdir(run_folder)
+
+    # create new run session
+    folder_name: Final[str] = datetime.now().strftime("%Y-%m-%dT%H-%M-%SZ")
+    log.info("Folder is named %s", folder_name)
+    os.mkdir(f"{run_folder}/{folder_name}")
+    # create file
+    return open(f"{run_folder}/{folder_name}/data.run", "w")
 
 
 async def main(address):
     # discover all possible connections
-    devices = await BleakScanner.discover()
-    print("\n".join([str(d) for d in devices]))
     async with BleakClient(address) as client:
-        # send hello world through bluetooth
-        # read the response
-        while True:
-            response = await client.read_gatt_char(CHARACTERISTIC_ID)
-            print(response)
-            print(response.decode())
-            print(len(response.decode()))
+        # read data from bluetooth
+        try:
+            file = create_run_file()
+            # writing header for csv file
+            file.write(
+                "".join(
+                    [
+                        "l_shank_x,l_shank_y,l_shank_z,l_thigh_x,l_thigh_y,l_thigh_z,"
+                        "r_shank_x,r_shank_y,r_shank_z,r_thigh_x,r_thigh_y,r_thigh_z\n"
+                    ]
+                )
+            )
+            while True:
+                left_leg_response: Final[str] = await client.read_gatt_char(LEFT_LEG_ID)
+                right_leg_response: Final[str] = await client.read_gatt_char(
+                    RIGHT_LEG_ID
+                )
 
-            time.sleep()
+                # add data to file
+                file.write(
+                    left_leg_response.decode()
+                    + ","
+                    + right_leg_response.decode()
+                    + "\n"
+                )
+
+                # give time for program to send more packets
+                time.sleep(round(1 / SAMPLES_PER_SECOND))
+        finally:
+            file.close()
 
 
-asyncio.run(main(CHANNEL_NAME))
+if __name__ == "__main__":
+    asyncio.run(main(CHANNEL_NAME))
