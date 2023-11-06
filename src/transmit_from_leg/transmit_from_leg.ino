@@ -19,12 +19,8 @@ uint32_t value = 0;
 // See the following for generating UUIDs:
 // https://www.uuidgenerator.net/
 
-#define SERVICE_UUID "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
-#define LEFT_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
-#define RIGHT_UUID "797e275d-3583-4403-8815-0e56a47ed5fa"
-
-#define REC_LEG_SERVICE "a26972ba-affb-420f-8b53-0db2d9124395"
-#define REC_LEG_CHAR "7b0eb53c-a873-466f-bc1c-1ff732f08957"
+#define SERVICE_UUID "a26972ba-affb-420f-8b53-0db2d9124395"
+#define LEFT_UUID "7b0eb53c-a873-466f-bc1c-1ff732f08957"
 
 class MyServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) { deviceConnected = true; };
@@ -36,7 +32,7 @@ void setup() {
   Serial.begin(115200);
 
   // Create the BLE Device
-  BLEDevice::init("StrideSync");
+  BLEDevice::init("STRIDESYNCLEGCPU");
 
   // Create the BLE Server
   pServer = BLEDevice::createServer();
@@ -44,22 +40,17 @@ void setup() {
 
   // Create the BLE Service
   BLEService* pService = pServer->createService(SERVICE_UUID);
+
   // Create a BLE Characteristic
   pLeft = pService->createCharacteristic(
       LEFT_UUID, BLECharacteristic::PROPERTY_READ |
                      BLECharacteristic::PROPERTY_WRITE |
                      BLECharacteristic::PROPERTY_NOTIFY |
                      BLECharacteristic::PROPERTY_INDICATE);
-  pRight = pService->createCharacteristic(
-      RIGHT_UUID, BLECharacteristic::PROPERTY_READ |
-                      BLECharacteristic::PROPERTY_WRITE |
-                      BLECharacteristic::PROPERTY_NOTIFY |
-                      BLECharacteristic::PROPERTY_INDICATE);
 
   // https://www.bluetooth.com/specifications/gatt/viewer?attributeXmlFile=org.bluetooth.descriptor.gatt.client_characteristic_configuration.xml
   // Create a BLE Descriptor
   pLeft->addDescriptor(new BLE2902());
-  pRight->addDescriptor(new BLE2902());
 
   // Start the service
   pService->start();
@@ -71,6 +62,7 @@ void setup() {
   pAdvertising->setMinPreferred(
       0x0);  // set value to 0x00 to not advertise this parameter
   BLEDevice::startAdvertising();
+  pServer->getAdvertising()->start();
   Serial.println("Waiting a client connection to notify...");
 }
 
@@ -83,9 +75,7 @@ void loop() {
     pLeft->setValue(buf_to_send);
     pLeft->notify();
 
-    pRight->setValue(buf_to_send);
-    pRight->notify();
-    delay(5);  // bluetooth stack will go into congestion, if too many packets
+    delay(67);  // bluetooth stack will go into congestion, if too many packets
                // are sent, in 6 hours test i was able to go as low as 3ms
     value++;
   }
@@ -98,6 +88,7 @@ void loop() {
   }
   // connecting
   if (deviceConnected && !oldDeviceConnected) {
+    Serial.println("Connected");
     // do stuff here on connecting
     oldDeviceConnected = deviceConnected;
   }

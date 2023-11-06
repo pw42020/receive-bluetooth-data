@@ -22,7 +22,7 @@ import logging
 from datetime import datetime
 from typing import Final, TextIO
 
-from bleak import BleakClient
+from bleak import BleakClient, BleakScanner
 
 # add assets directory to the path
 sys.path.append(str(Path(os.path.dirname(__file__)).parent.parent / "assets"))
@@ -85,8 +85,26 @@ async def main(address):
     address: str
         address of bluetooth device
     """
-    async with BleakClient(address) as client:
+    # discover all devices
+    devices = await BleakScanner.discover()
+    # print all devices
+    chosen_device = None
+    for device in devices:
+        if device.name == "STRIDESYNCLEGPROCESSOR":
+            chosen_device = device
+        log.debug("Name: %s, address: %s", device.name, device.address)
+
+    if chosen_device is None:
+        log.critical("Could not find device")
+        return
+
+    async with BleakClient(chosen_device.address) as client:
         # read data from bluetooth
+        # read all of client's characteristics
+        log.info("Connected: %s", await client.is_connected())
+        # print all services
+        for service in client.services:
+            log.info("Service: %s", service)
         try:
             file = create_run_file()
             # writing header for csv file
