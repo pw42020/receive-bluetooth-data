@@ -10,11 +10,11 @@
 
 #define bleServerName "STRIDESYNCLEGCPU"
 // The remote service we wish to connect to.
-// previous UUID thought to be "a26972ba-affb-420f-8b53-0db2d9124395"
 #define SERVICE_UUID "a26972ba-affb-420f-8b53-0db2d9124395"
+#define CHARACTERISTIC_UUID "7b0eb53c-a873-466f-bc1c-1ff732f08957"
 static BLEUUID serviceUUID(SERVICE_UUID);
 // The characteristic of the remote service we are interested in.
-static BLEUUID    charUUID("7b0eb53c-a873-466f-bc1c-1ff732f08957");
+static BLEUUID    charUUID(CHARACTERISTIC_UUID);
 
 static boolean doConnect = false;
 static boolean connected = false;

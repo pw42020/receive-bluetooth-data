@@ -138,4 +138,13 @@ async def main(address):
 
 
 if __name__ == "__main__":
-    asyncio.run(main(CHANNEL_NAME))
+    # asyncio.run(main(CHANNEL_NAME))
+    file = create_run_file()
+    file.write(
+        "".join(
+            [
+                "l_shank_x,l_shank_y,l_shank_z,l_thigh_x,l_thigh_y,l_thigh_z,"
+                "r_shank_x,r_shank_y,r_shank_z,r_thigh_x,r_thigh_y,r_thigh_z\n"
+            ]
+        )
+    )

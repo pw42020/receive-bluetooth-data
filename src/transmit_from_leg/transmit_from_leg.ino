@@ -8,6 +8,9 @@
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLEUtils.h>
+#include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BNO055.h>
 
 BLEServer* pServer = NULL;
 BLECharacteristic* pLeft = NULL;
@@ -15,6 +18,9 @@ BLECharacteristic* pRight = NULL;
 bool deviceConnected = false;
 bool oldDeviceConnected = false;
 uint32_t value = 0;
+
+Adafruit_BNO055 bnoquad = Adafruit_BNO055(55,0x28);
+Adafruit_BNO055 bnoshin = Adafruit_BNO055(56,0x29);
 
 // See the following for generating UUIDs:
 // https://www.uuidgenerator.net/
@@ -28,8 +34,26 @@ class MyServerCallbacks : public BLEServerCallbacks {
   void onDisconnect(BLEServer* pServer) { deviceConnected = false; }
 };
 
+void setup_bno055() {
+  if(!bnoquad.begin()) //init bnoquad
+  {
+    Serial.print("Ooops, no BNO055.1 detected ... Check your wiring or I2C ADDR!");
+    while(1);
+  }
+  if(!bnoshin.begin()) //init bnoshin
+  {
+    Serial.print("Ooops, no BNO055.2 detected ... Check your wiring or I2C ADDR!");
+    while(1);
+  }
+  delay(1000);
+  bnoquad.setExtCrystalUse(true);
+  bnoshin.setExtCrystalUse(true);
+}
+
 void setup() {
   Serial.begin(115200);
+
+  setup_bno055();
 
   // Create the BLE Device
   BLEDevice::init("STRIDESYNCLEGCPU");
@@ -69,9 +93,21 @@ void setup() {
 void loop() {
   // notify changed value
   if (deviceConnected) {
-    char buf_to_send[30];
-    sprintf(buf_to_send, "%d,%d,%d,%d,%d,%d", value + 1, value + 2, value + 3,
-            value + 4, value + 5, value + 6);
+    sensors_event_t event; //new sensor event
+    bnoquad.getEvent(&event); //read bnoquad event
+    sensors_vec_t quad_ori;
+    memcpy(&quad_ori, &event.orientation, sizeof(sensors_vec_t));
+    bnoshin.getEvent(&event); //read bnoshin event
+    sensors_vec_t shin_ori;
+    memcpy(&shin_ori, &event.orientation, sizeof(sensors_vec_t));
+    Serial.println("Shin orientation: ");
+    Serial.print(shin_ori.x);
+    Serial.print(", ");
+    Serial.print(shin_ori.y);
+    Serial.print(", ");
+    Serial.println(shin_ori.z);
+    char buf_to_send[80];
+    sprintf(buf_to_send, "%.2f,%.2f,%.2f,%.2f,%.2f,%.2f", shin_ori.x, shin_ori.y, shin_ori.z, quad_ori.x, quad_ori.y, quad_ori.z);
     pLeft->setValue(buf_to_send);
     pLeft->notify();
 
