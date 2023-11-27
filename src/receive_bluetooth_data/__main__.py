@@ -49,9 +49,11 @@ log.addHandler(ch)
 
 # global variables
 NAME = "ESP32"
-CHANNEL_NAME = "C2431FC1-6A48-D48C-FEBA-7AA454D2B165"
-LEFT_LEG_ID = "beb5483e-36e1-4688-b7f5-ea07361b26a8"
-RIGHT_LEG_ID = "797e275d-3583-4403-8815-0e56a47ed5fa"
+# CHANNEL_NAME = "C2431FC1-6A48-D48C-FEBA-7AA454D2B165"
+# LEFT_LEG_ID = "7b0eb53c-a873-466f-bc1c-1ff732f08957"
+# RIGHT_LEG_ID = "797e275d-3583-4403-8815-0e56a47ed5fa"
+
+CHANNEL_NAME = "4BE89814-827A-7A33-0672-DE98DFF5888D"
 
 SAMPLES_PER_SECOND: Final[int] = 15
 
@@ -90,7 +92,7 @@ async def main(address):
     # print all devices
     chosen_device = None
     for device in devices:
-        if device.name == "STRIDESYNCLEGPROCESSOR":
+        if device.name == NAME:
             chosen_device = device
         log.debug("Name: %s, address: %s", device.name, device.address)
 
@@ -118,16 +120,13 @@ async def main(address):
             )
             while True:
                 left_leg_response: Final[str] = await client.read_gatt_char(LEFT_LEG_ID)
-                right_leg_response: Final[str] = await client.read_gatt_char(
-                    RIGHT_LEG_ID
-                )
+                # right_leg_response: Final[str] = await client.read_gatt_char(
+                #     RIGHT_LEG_ID
+                # )
 
                 # add data to file
                 file.write(
-                    left_leg_response.decode()
-                    + ","
-                    + right_leg_response.decode()
-                    + "\n"
+                    left_leg_response.decode() + "," + left_leg_response.decode() + "\n"
                 )
 
                 # give time for program to send more packets
@@ -138,13 +137,13 @@ async def main(address):
 
 
 if __name__ == "__main__":
-    # asyncio.run(main(CHANNEL_NAME))
-    file = create_run_file()
-    file.write(
-        "".join(
-            [
-                "l_shank_x,l_shank_y,l_shank_z,l_thigh_x,l_thigh_y,l_thigh_z,"
-                "r_shank_x,r_shank_y,r_shank_z,r_thigh_x,r_thigh_y,r_thigh_z\n"
-            ]
-        )
-    )
+    asyncio.run(main(CHANNEL_NAME))
+    # file = create_run_file()
+    # file.write(
+    #     "".join(
+    #         [
+    #             "l_shank_x,l_shank_y,l_shank_z,l_thigh_x,l_thigh_y,l_thigh_z,"
+    #             "r_shank_x,r_shank_y,r_shank_z,r_thigh_x,r_thigh_y,r_thigh_z\n"
+    #         ]
+    #     )
+    # )
