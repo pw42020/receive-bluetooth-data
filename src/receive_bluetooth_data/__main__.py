@@ -124,7 +124,12 @@ async def main(address):
                 # )
 
                 # add data to file
-                file.write(left_leg_response.decode())
+                try:
+                    if left_leg_response.decode() != "DONE":
+                        file.write(left_leg_response[:78].decode())
+                    time.sleep(0.005)
+                except Exception as e:
+                    log.error("Error: %s", e)
 
                 # give time for program to send more packets
                 # time.sleep(round(1 / SAMPLES_PER_SECOND))

@@ -521,32 +521,42 @@ void loop() {
       if (pClient)
         pClient->disconnect(); // disconnecting from leg processors
       pClient = NULL; // trying to stop issue of disconnecting multiple times
-      Serial.println("Stopped run, waiting for chance to transmit");
 
       // notify changed value
       if (deviceConnected) {
         // send first file over and delete it upon completion of reading it all
         // NOTE: start here, not working with this code uncommented
-        // File root = SD.open(fileToWrite);
+        File file = SD.open(fileToWrite);
 
-        // File file = root.openNextFile();
+        Serial.println((const char *)pLeg->getData());
+        if (!strcmp((const char *)pLeg->getData(), "START")) {
+          Serial.println("reading /session0.csv");
+          char buf[81];
+          while(file.available()) {
+            file.readBytes(buf, 80);
+            Serial.print(buf);
+            pLeg->setValue(buf);
+            pLeg->notify();
 
-        // char buf[60];
-        // while(file.available()) {
-        //   file.readBytes(buf, 60);
-        //   pLeg->setValue(buf);
-        //   pLeg->notify();
-        // }
-        // // delete file upon completion of transmission
-        // deleteFile(SD, file.name());
-
-        delay(5);  // bluetooth stack will go into congestion, if too many packets
-                  // are sent, in 6 hours test i was able to go as low as 3ms
+            delay(5);  // bluetooth stack will go into congestion, if too many packets
+                      // are sent, in 6 hours test i was able to go as low as 3ms
+          }
+          Serial.print("Attempting to delete ");
+          Serial.println(file.name());
+          // delete file upon completion of transmission
+          deleteFile(SD, file.name());
+          pLeg->setValue("DONE");
+          pLeg->notify();
+        }
+        
       }
       // disconnecting
       if (!deviceConnected && oldDeviceConnected) {
         delay(500);  // give the bluetooth stack the chance to get things ready
+        pLeg->setValue("START");
+        pLeg->notify();
         pServer->startAdvertising();  // restart advertising
+        Serial.println("Stopped run, waiting for chance to transmit");
         Serial.println("start advertising");
         oldDeviceConnected = deviceConnected;
       }
