@@ -50,7 +50,7 @@ log.addHandler(ch)
 # global variables
 NAME = "StrideSync"
 # CHANNEL_NAME = "C2431FC1-6A48-D48C-FEBA-7AA454D2B165"
-LEFT_LEG_ID = "beb5483e-36e1-4688-b7f5-ea07361b26a8"
+LEG_ID = "beb5483e-36e1-4688-b7f5-ea07361b26a8"
 
 CHANNEL_NAME = "4BE89814-827A-7A33-0672-DE98DFF5888D"
 
@@ -118,18 +118,24 @@ async def main(address):
                 )
             )
             while True:
-                left_leg_response: Final[str] = await client.read_gatt_char(LEFT_LEG_ID)
-                # right_leg_response: Final[str] = await client.read_gatt_char(
-                #     RIGHT_LEG_ID
-                # )
+                left_leg_response: Final[str] = await client.read_gatt_char(LEG_ID)
+                if left_leg_response.decode() == "GOOD":
+                    continue
+                # write GOOD to client
 
                 # add data to file
                 try:
                     if left_leg_response.decode() != "DONE":
-                        file.write(left_leg_response[:78].decode())
-                    time.sleep(0.005)
+                        file.write(left_leg_response.decode() + "\n")
+                    else:
+                        log.info("DONE")
+                        break
+                    # time.sleep(0.005)
                 except Exception as e:
                     log.error("Error: %s", e)
+
+                if left_leg_response.decode() != "DONE":
+                    await client.write_gatt_char(LEG_ID, b"GOOD")
 
                 # give time for program to send more packets
                 # time.sleep(round(1 / SAMPLES_PER_SECOND))

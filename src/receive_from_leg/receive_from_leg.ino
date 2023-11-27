@@ -531,12 +531,20 @@ void loop() {
         Serial.println((const char *)pLeg->getData());
         if (!strcmp((const char *)pLeg->getData(), "START")) {
           Serial.println("reading /session0.csv");
-          char buf[81];
+          String buf;
+          char terminator = '\n';
           while(file.available()) {
-            file.readBytes(buf, 80);
-            Serial.print(buf);
-            pLeg->setValue(buf);
+            buf = file.readStringUntil(terminator);
+            Serial.print("Sent ");
+            Serial.println(buf);
+            pLeg->setValue(buf.c_str());
             pLeg->notify();
+
+            // waiting for reader to say they've received all the data
+            while(strcmp((const char *)pLeg->getData(), "GOOD")) {
+              // Serial.println("WAITING UNTIL GOOD");
+              delay(1);
+            }
 
             delay(5);  // bluetooth stack will go into congestion, if too many packets
                       // are sent, in 6 hours test i was able to go as low as 3ms
