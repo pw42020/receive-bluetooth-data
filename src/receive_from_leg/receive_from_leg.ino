@@ -9,13 +9,28 @@
 #include "SPI.h"
 
 #include "BLEDevice.h"
-//#include "BLEScan.h"
+#include <BLE2902.h>
+#include <BLEServer.h>
+#include <BLEUtils.h>
 
+// server information
+BLEServer* pServer = NULL;
+BLECharacteristic* pLeg = NULL;
+bool deviceConnected = false;
+bool oldDeviceConnected = false;
+
+// information for receiving data
 #define bleServerName "STRIDESYNCLEGCPU"
 // The remote service we wish to connect to.
 #define SERVICE_UUID "a26972ba-affb-420f-8b53-0db2d9124395"
 #define CHARACTERISTIC_UUID "7b0eb53c-a873-466f-bc1c-1ff732f08957"
 
+// information for transmitting data
+#define TRANSMIT_SERVICE_UUID "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
+#define LEG_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
+
+#define REC_LEG_SERVICE "a26972ba-affb-420f-8b53-0db2d9124395"
+#define REC_LEG_CHAR "7b0eb53c-a873-466f-bc1c-1ff732f08957"
 
 const int buttonPin = 0;
 const int ledPin = A2;    // the number of the LED pin
@@ -34,7 +49,10 @@ int buttonState = 1;
 int lastButtonState = 1;
 int receive = 1;
 
-char * fileToWrite;
+BLEClient*  pClient;
+
+
+char * fileToWrite = "/session0.csv";
 
 /** All information regarding SD card write and read **/
 
@@ -225,8 +243,7 @@ static void notifyCallback(
     // Serial.println(length);
     // Serial.print("data: ");
     // Serial.write(pData, length);
-    if (fileToWrite == NULL)
-      openNewFileToWrite();
+    // if (fileToWrite == NULL)
     char buf[length + 2] = {};
     memcpy(buf, pData, length);
     strcat(buf, "\n"); // adding new line character to 
@@ -237,7 +254,24 @@ static void notifyCallback(
     // Serial.println(fileToWrite);
     // Serial.println();
     delay(67); // delay for 67ms to mimic 15Hz sample rate which we will be receiving
+
+    // check once again to see if done with run
+    lastButtonState = buttonState;
+    buttonState = digitalRead(buttonPin);
+
+    // check if the pushbutton is pressed. If it is, the buttonState is HIGH:
+    if (buttonState == HIGH && lastButtonState == LOW) {
+      // turn LED on:
+      receive = !receive;
+      digitalWrite(ledPin, receive);
+    }
 }
+
+class MyServerCallbacks : public BLEServerCallbacks {
+  void onConnect(BLEServer* pServer) { deviceConnected = true; };
+
+  void onDisconnect(BLEServer* pServer) { deviceConnected = false; }
+};
 
 class MyClientCallback : public BLEClientCallbacks {
   void onConnect(BLEClient* pclient) {
@@ -249,11 +283,12 @@ class MyClientCallback : public BLEClientCallbacks {
   }
 };
 
-bool connectToServer() {
+/** returns pClient so user can disconnect later */
+BLEClient* connectToServer() {
     Serial.print("Forming a connection to ");
     Serial.println(myDevice->getAddress().toString().c_str());
     
-    BLEClient*  pClient  = BLEDevice::createClient();
+    pClient  = BLEDevice::createClient();
     Serial.println(" - Created client");
 
     pClient->setClientCallbacks(new MyClientCallback());
@@ -265,17 +300,13 @@ bool connectToServer() {
   
     // Obtain a reference to the service we are after in the remote BLE server.
     Serial.println("Available services:");
-    // for(auto const& [key, val]: pClient->getServices()) {
-    //   Serial.print(key);
-    //   Serial.print(": ");
-    //   Serial.println(val);
-    // }
+
     BLERemoteService* pRemoteService = pClient->getService(serviceUUID);
     if (pRemoteService == nullptr) {
       Serial.print("Failed to find our service UUID: ");
       Serial.println(serviceUUID.toString().c_str());
       pClient->disconnect();
-      return false;
+      return NULL;
     }
     Serial.println(" - Found our service");
 
@@ -286,7 +317,7 @@ bool connectToServer() {
       Serial.print("Failed to find our characteristic UUID: ");
       Serial.println(charUUID.toString().c_str());
       pClient->disconnect();
-      return false;
+      return NULL;
     }
     Serial.println(" - Found our characteristic");
 
@@ -301,7 +332,7 @@ bool connectToServer() {
       pRemoteCharacteristic->registerForNotify(notifyCallback);
 
     connected = true;
-    return true;
+    return pClient;
 }
 
 void openNewFileToWrite() {
@@ -316,15 +347,15 @@ void openNewFileToWrite() {
   }
 
   if (file == NULL) {
-    fileToWrite = "/0.run";
+    fileToWrite = "/session0.csv";
   } else {
     // creating file of newest number (i.e. 1->2, 12->13, etc)
     std::string filename = file.name();
 
     fileToWrite = "/";
 
-    // remove '/' and '.run'
-    sprintf(fileToWrite, "/%d.run", atoi(filename.substr(1, filename.size() - 4).c_str()) + 1);
+    // remove '/' and '.csv'
+    sprintf(fileToWrite, "/session%d.csv", atoi(filename.substr(8, filename.size() - 4).c_str()) + 1);
     writeFile(SD, fileToWrite, "");
   }
   Serial.print("Created file named ");
@@ -361,8 +392,7 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
 
 void setupMicroSD() {
   digitalWrite(RX, LOW);
-  Serial.begin(115200);
-  Serial.println("Hello world");
+  Serial.println("Hello Stride Sync MicroSD initialization");
   if(!SD.begin(RX)){
       Serial.println("Card Mount Failed");
       return;
@@ -384,6 +414,15 @@ void setupMicroSD() {
   } else {
       Serial.println("UNKNOWN");
   }
+
+  listDir(SD, "/", 0);
+  writeFile(SD, "/hello.txt", "Hello ");
+  appendFile(SD, "/hello.txt", "World!\n");
+  readFile(SD, "/hello.txt");
+  deleteFile(SD, "/hello.txt");
+  writeFile(SD, fileToWrite, "");
+  
+  return;
 }
 
 
@@ -392,10 +431,11 @@ void setup() {
 
   // initializing MicroSD card
   setupMicroSD();
+  
 
   // setting up BLE Application
   Serial.println("Starting Arduino BLE Client application...");
-  BLEDevice::init("");
+  BLEDevice::init("StrideSync");
 
   // Retrieve a Scanner and set the callback we want to use to be informed when we
   // have detected a new device.  Specify that we want active scanning and start the
@@ -406,6 +446,33 @@ void setup() {
   pBLEScan->setWindow(449);
   pBLEScan->setActiveScan(true);
   pBLEScan->start(5, false);
+
+  // Start advertising
+  // Create the BLE Server
+  pServer = BLEDevice::createServer();
+  pServer->setCallbacks(new MyServerCallbacks());
+
+  BLEService* pService = pServer->createService(TRANSMIT_SERVICE_UUID);
+
+  // Create a BLE Characteristic
+  pLeg = pService->createCharacteristic(
+      LEG_UUID, BLECharacteristic::PROPERTY_READ |
+                     BLECharacteristic::PROPERTY_WRITE |
+                     BLECharacteristic::PROPERTY_NOTIFY |
+                     BLECharacteristic::PROPERTY_INDICATE);
+
+  pLeg->addDescriptor(new BLE2902());
+
+  // setup all transmission information to computer
+  // Start the service
+  pService->start();
+  
+
+  BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
+  pAdvertising->addServiceUUID(SERVICE_UUID);
+  pAdvertising->setScanResponse(false);
+  pAdvertising->setMinPreferred(
+      0x0);  // set value to 0x00 to not advertise this parameter
   
   // set up pushbutton to turn on or off transmission
   pinMode(buttonPin, INPUT_PULLUP);
@@ -425,11 +492,14 @@ void loop() {
   }
 
   if(receive) {
+    if (!connected) // start scanning if have been disconnected
+      BLEDevice::getScan()->start(0); 
     // If the flag "doConnect" is true then we have scanned for and found the desired
     // BLE Server with which we wish to connect.  Now we connect to it.  Once we are 
     // connected we set the connected flag to be true.
     if (doConnect == true) {
-      if (connectToServer()) {
+      pClient = connectToServer();
+      if (pClient != NULL) {
 
         Serial.println("CONNECTED TO SERVER.");
       } else {
@@ -446,12 +516,45 @@ void loop() {
       
       // Set the characteristic's value to be the array of bytes that is actually a string.
       pRemoteCharacteristic->writeValue(newValue.c_str(), newValue.length());
-    }else if(doScan){
-      BLEDevice::getScan()->start(0);  // this is just example to start scan after disconnect, most likely there is better way to do it in arduino
     }
   } else {
-      BLEDevice::disconnect
-      Serial.println("Stopped run");
+      if (pClient)
+        pClient->disconnect(); // disconnecting from leg processors
+      pClient = NULL; // trying to stop issue of disconnecting multiple times
+      Serial.println("Stopped run, waiting for chance to transmit");
+
+      // notify changed value
+      if (deviceConnected) {
+        // send first file over and delete it upon completion of reading it all
+        // NOTE: start here, not working with this code uncommented
+        // File root = SD.open(fileToWrite);
+
+        // File file = root.openNextFile();
+
+        // char buf[60];
+        // while(file.available()) {
+        //   file.readBytes(buf, 60);
+        //   pLeg->setValue(buf);
+        //   pLeg->notify();
+        // }
+        // // delete file upon completion of transmission
+        // deleteFile(SD, file.name());
+
+        delay(5);  // bluetooth stack will go into congestion, if too many packets
+                  // are sent, in 6 hours test i was able to go as low as 3ms
+      }
+      // disconnecting
+      if (!deviceConnected && oldDeviceConnected) {
+        delay(500);  // give the bluetooth stack the chance to get things ready
+        pServer->startAdvertising();  // restart advertising
+        Serial.println("start advertising");
+        oldDeviceConnected = deviceConnected;
+      }
+      // connecting
+      if (deviceConnected && !oldDeviceConnected) {
+        // do stuff here on connecting
+        oldDeviceConnected = deviceConnected;
+      }
   }
   
   delay(500); // Delay half a second between loops.

@@ -20,8 +20,7 @@ uint32_t value = 0;
 // https://www.uuidgenerator.net/
 
 #define SERVICE_UUID "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
-#define LEFT_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
-#define RIGHT_UUID "797e275d-3583-4403-8815-0e56a47ed5fa"
+#define LEG_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
 
 #define REC_LEG_SERVICE "a26972ba-affb-420f-8b53-0db2d9124395"
 #define REC_LEG_CHAR "7b0eb53c-a873-466f-bc1c-1ff732f08957"

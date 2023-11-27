@@ -48,10 +48,9 @@ ch.setFormatter(CustomFormatter())
 log.addHandler(ch)
 
 # global variables
-NAME = "ESP32"
+NAME = "StrideSync"
 # CHANNEL_NAME = "C2431FC1-6A48-D48C-FEBA-7AA454D2B165"
-# LEFT_LEG_ID = "7b0eb53c-a873-466f-bc1c-1ff732f08957"
-# RIGHT_LEG_ID = "797e275d-3583-4403-8815-0e56a47ed5fa"
+LEFT_LEG_ID = "beb5483e-36e1-4688-b7f5-ea07361b26a8"
 
 CHANNEL_NAME = "4BE89814-827A-7A33-0672-DE98DFF5888D"
 
@@ -125,12 +124,10 @@ async def main(address):
                 # )
 
                 # add data to file
-                file.write(
-                    left_leg_response.decode() + "," + left_leg_response.decode() + "\n"
-                )
+                file.write(left_leg_response.decode())
 
                 # give time for program to send more packets
-                time.sleep(round(1 / SAMPLES_PER_SECOND))
+                # time.sleep(round(1 / SAMPLES_PER_SECOND))
         finally:
             # closing the file when the program is complete or an error occurs
             file.close()
