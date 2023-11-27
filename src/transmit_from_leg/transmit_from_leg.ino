@@ -25,6 +25,8 @@ Adafruit_BNO055 bnoshin = Adafruit_BNO055(56,0x29);
 // See the following for generating UUIDs:
 // https://www.uuidgenerator.net/
 
+#define rightLegBLESERVERNAME "StrideSync"
+
 #define SERVICE_UUID "a26972ba-affb-420f-8b53-0db2d9124395"
 #define LEFT_UUID "7b0eb53c-a873-466f-bc1c-1ff732f08957"
 
@@ -56,7 +58,7 @@ void setup() {
   // setup_bno055();
 
   // Create the BLE Device
-  BLEDevice::init("STRIDESYNCLEGCPU");
+  BLEDevice::init(rightLegBLESERVERNAME);
 
   // Create the BLE Server
   pServer = BLEDevice::createServer();
@@ -108,7 +110,7 @@ void loop() {
     // Serial.println(shin_ori.z);
     char buf_to_send[80];
     // sprintf(buf_to_send, "%.2f,%.2f,%.2f,%.2f,%.2f,%.2f", shin_ori.x, shin_ori.y, shin_ori.z, quad_ori.x, quad_ori.y, quad_ori.z);
-    sprintf(buf_to_send, "180,180,180,180,180,180");
+    sprintf(buf_to_send, "90,90,90,90,90,90");
     pLeft->setValue(buf_to_send);
     pLeft->notify();
 

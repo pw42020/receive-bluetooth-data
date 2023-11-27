@@ -15,29 +15,29 @@
 
 // server information
 BLEServer* pServer = NULL;
-BLECharacteristic* pLeg = NULL;
+BLECharacteristic* pTransmit = NULL;
+BLECharacteristic* pLeft = NULL;
+BLECharacteristic* pRight = NULL;
 bool deviceConnected = false;
 bool oldDeviceConnected = false;
 
 // information for receiving data
-#define bleServerName "STRIDESYNCLEGCPU"
+#define leftLegBLESERVERNAME "STRIDESYNCLEGCPU_LEFT"
+#define rightLegBLESERVERNAME "STRIDESYNCLEGCPU_RIGHT"
 // The remote service we wish to connect to.
 #define SERVICE_UUID "a26972ba-affb-420f-8b53-0db2d9124395"
-#define CHARACTERISTIC_UUID "7b0eb53c-a873-466f-bc1c-1ff732f08957"
+#define LEFT_LEG_UUID "7b0eb53c-a873-466f-bc1c-1ff732f08957"
+#define RIGHT_LEG_UUID "f542a2e9-d11f-4e48-999c-242ef20b5876"
 
 // information for transmitting data
 #define TRANSMIT_SERVICE_UUID "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
-#define LEG_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
-
-#define REC_LEG_SERVICE "a26972ba-affb-420f-8b53-0db2d9124395"
-#define REC_LEG_CHAR "7b0eb53c-a873-466f-bc1c-1ff732f08957"
+#define TRANSMIT_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
 
 const int buttonPin = 0;
 const int ledPin = A2;    // the number of the LED pin
 
 static BLEUUID serviceUUID(SERVICE_UUID);
 // The characteristic of the remote service we are interested in.
-static BLEUUID    charUUID(CHARACTERISTIC_UUID);
 
 static boolean doConnect = false;
 static boolean connected = false;
@@ -213,25 +213,6 @@ void testFileIO(fs::FS &fs, const char * path){
     file.close();
 }
 
-void setupDEPRECATED(){
-
-    // helpful information on how to write and read to the new file
-    // listDir(SD, "/", 0);
-    // createDir(SD, "/mydir");
-    // listDir(SD, "/", 0);
-    // removeDir(SD, "/mydir");
-    // listDir(SD, "/", 2);
-    // writeFile(SD, "/hello.txt", "Hello ");
-    // appendFile(SD, "/hello.txt", "World!\n");
-    // readFile(SD, "/hello.txt");
-    // deleteFile(SD, "/foo.txt");
-    // renameFile(SD, "/hello.txt", "/foo.txt");
-    // readFile(SD, "/foo.txt");
-    // testFileIO(SD, "/test.txt");
-    // Serial.printf("Total space: %lluMB\n", SD.totalBytes() / (1024 * 1024));
-    // Serial.printf("Used space: %lluMB\n", SD.usedBytes() / (1024 * 1024));
-}
-
 static void notifyCallback(
   BLERemoteCharacteristic* pBLERemoteCharacteristic,
   uint8_t* pData,
@@ -268,7 +249,9 @@ static void notifyCallback(
 }
 
 class MyServerCallbacks : public BLEServerCallbacks {
-  void onConnect(BLEServer* pServer) { deviceConnected = true; };
+  void onConnect(BLEServer* pServer) { 
+    BLEDevice::startAdvertising();
+    deviceConnected = true; };
 
   void onDisconnect(BLEServer* pServer) { deviceConnected = false; }
 };
@@ -284,56 +267,56 @@ class MyClientCallback : public BLEClientCallbacks {
 };
 
 /** returns pClient so user can disconnect later */
-BLEClient* connectToServer() {
-    Serial.print("Forming a connection to ");
-    Serial.println(myDevice->getAddress().toString().c_str());
+// BLEClient* connectToServer() {
+//     Serial.print("Forming a connection to ");
+//     Serial.println(myDevice->getAddress().toString().c_str());
     
-    pClient  = BLEDevice::createClient();
-    Serial.println(" - Created client");
+//     pClient  = BLEDevice::createClient();
+//     Serial.println(" - Created client");
 
-    pClient->setClientCallbacks(new MyClientCallback());
+//     pClient->setClientCallbacks(new MyClientCallback());
 
-    // Connect to the remove BLE Server.
-    pClient->connect(myDevice);  // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)
-    Serial.println(" - Connected to server");
-    pClient->setMTU(517); //set client to request maximum MTU from server (default is 23 otherwise)
+//     // Connect to the remove BLE Server.
+//     pClient->connect(myDevice);  // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)
+//     Serial.println(" - Connected to server");
+//     pClient->setMTU(517); //set client to request maximum MTU from server (default is 23 otherwise)
   
-    // Obtain a reference to the service we are after in the remote BLE server.
-    Serial.println("Available services:");
+//     // Obtain a reference to the service we are after in the remote BLE server.
+//     Serial.println("Available services:");
 
-    BLERemoteService* pRemoteService = pClient->getService(serviceUUID);
-    if (pRemoteService == nullptr) {
-      Serial.print("Failed to find our service UUID: ");
-      Serial.println(serviceUUID.toString().c_str());
-      pClient->disconnect();
-      return NULL;
-    }
-    Serial.println(" - Found our service");
+//     BLERemoteService* pRemoteService = pClient->getService(serviceUUID);
+//     if (pRemoteService == nullptr) {
+//       Serial.print("Failed to find our service UUID: ");
+//       Serial.println(serviceUUID.toString().c_str());
+//       pClient->disconnect();
+//       return NULL;
+//     }
+//     Serial.println(" - Found our service");
 
 
-    // Obtain a reference to the characteristic in the service of the remote BLE server.
-    pRemoteCharacteristic = pRemoteService->getCharacteristic(charUUID);
-    if (pRemoteCharacteristic == nullptr) {
-      Serial.print("Failed to find our characteristic UUID: ");
-      Serial.println(charUUID.toString().c_str());
-      pClient->disconnect();
-      return NULL;
-    }
-    Serial.println(" - Found our characteristic");
+//     // Obtain a reference to the characteristic in the service of the remote BLE server.
+//     pRemoteCharacteristic = pRemoteService->getCharacteristic(charUUID);
+//     if (pRemoteCharacteristic == nullptr) {
+//       Serial.print("Failed to find our characteristic UUID: ");
+//       Serial.println(charUUID.toString().c_str());
+//       pClient->disconnect();
+//       return NULL;
+//     }
+//     Serial.println(" - Found our characteristic");
 
-    // Read the value of the characteristic.
-    if(pRemoteCharacteristic->canRead()) {
-      std::string value = pRemoteCharacteristic->readValue();
-      Serial.print("The characteristic value was: ");
-      Serial.println(value.c_str());
-    }
+//     // Read the value of the characteristic.
+//     if(pRemoteCharacteristic->canRead()) {
+//       std::string value = pRemoteCharacteristic->readValue();
+//       Serial.print("The characteristic value was: ");
+//       Serial.println(value.c_str());
+//     }
 
-    if(pRemoteCharacteristic->canNotify())
-      pRemoteCharacteristic->registerForNotify(notifyCallback);
+//     if(pRemoteCharacteristic->canNotify())
+//       pRemoteCharacteristic->registerForNotify(notifyCallback);
 
-    connected = true;
-    return pClient;
-}
+//     connected = true;
+//     return pClient;
+// }
 
 void openNewFileToWrite() {
   // opening new file to write all characteristics to
@@ -379,7 +362,7 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
       Serial.print("Advertised device has service UUIDs: ");
       Serial.println(advertisedDevice.haveServiceUUID());
     }
-    if (advertisedDevice.getName() == bleServerName) { //Check if the name of the advertiser matches
+    if (advertisedDevice.getName() == leftLegBLESERVERNAME) { //Check if the name of the advertiser matches
       advertisedDevice.getScan()->stop(); //Scan can be stopped, we found what we are looking for
       BLEDevice::getScan()->stop();
       myDevice = new BLEAdvertisedDevice(advertisedDevice); //Address of advertiser is the one we need
@@ -434,18 +417,8 @@ void setup() {
   
 
   // setting up BLE Application
-  Serial.println("Starting Arduino BLE Client application...");
+  Serial.println("Starting Arduino BLE Server application...");
   BLEDevice::init("StrideSync");
-
-  // Retrieve a Scanner and set the callback we want to use to be informed when we
-  // have detected a new device.  Specify that we want active scanning and start the
-  // scan to run for 5 seconds.
-  BLEScan* pBLEScan = BLEDevice::getScan();
-  pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
-  pBLEScan->setInterval(1349);
-  pBLEScan->setWindow(449);
-  pBLEScan->setActiveScan(true);
-  pBLEScan->start(5, false);
 
   // Start advertising
   // Create the BLE Server
@@ -453,29 +426,50 @@ void setup() {
   pServer->setCallbacks(new MyServerCallbacks());
 
   BLEService* pService = pServer->createService(TRANSMIT_SERVICE_UUID);
+  BLEService* pReceiveService = pServer->createService(SERVICE_UUID);
 
   // Create a BLE Characteristic
-  pLeg = pService->createCharacteristic(
-      LEG_UUID, BLECharacteristic::PROPERTY_READ |
+  pTransmit = pService->createCharacteristic(
+      TRANSMIT_UUID, BLECharacteristic::PROPERTY_READ |
                      BLECharacteristic::PROPERTY_WRITE |
                      BLECharacteristic::PROPERTY_NOTIFY |
                      BLECharacteristic::PROPERTY_INDICATE);
 
-  pLeg->addDescriptor(new BLE2902());
+  // create characteristics for receiving data
+  pLeft = pReceiveService->createCharacteristic(
+    LEFT_LEG_UUID, BLECharacteristic::PROPERTY_READ |
+                     BLECharacteristic::PROPERTY_WRITE |
+                     BLECharacteristic::PROPERTY_NOTIFY |
+                     BLECharacteristic::PROPERTY_INDICATE);
+
+  pRight = pReceiveService->createCharacteristic(
+    RIGHT_LEG_UUID, BLECharacteristic::PROPERTY_READ |
+                     BLECharacteristic::PROPERTY_WRITE |
+                     BLECharacteristic::PROPERTY_NOTIFY |
+                     BLECharacteristic::PROPERTY_INDICATE);
+
+  pTransmit->addDescriptor(new BLE2902());
+  pLeft->addDescriptor(new BLE2902());
+  pRight->addDescriptor(new BLE2902());
+
 
   // setup all transmission information to computer
   // Start the service
   pService->start();
+  pReceiveService->start();
   
 
   BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
   pAdvertising->addServiceUUID(SERVICE_UUID);
+  pAdvertising->addServiceUUID(TRANSMIT_SERVICE_UUID);
   pAdvertising->setScanResponse(false);
   pAdvertising->setMinPreferred(
       0x0);  // set value to 0x00 to not advertise this parameter
   
   // set up pushbutton to turn on or off transmission
   pinMode(buttonPin, INPUT_PULLUP);
+  BLEDevice::startAdvertising();
+  Serial.println("Started advertising.");
 } // End of setup.
 
 
@@ -491,89 +485,72 @@ void loop() {
     digitalWrite(ledPin, receive);
   }
 
-  if(receive) {
-    if (!connected) // start scanning if have been disconnected
-      BLEDevice::getScan()->start(0); 
-    // If the flag "doConnect" is true then we have scanned for and found the desired
-    // BLE Server with which we wish to connect.  Now we connect to it.  Once we are 
-    // connected we set the connected flag to be true.
-    if (doConnect == true) {
-      pClient = connectToServer();
-      if (pClient != NULL) {
-
-        Serial.println("CONNECTED TO SERVER.");
+  if (deviceConnected) {
+      if (receive) {
+        if (strcmp((const char*)pLeft->getData(), "START") && strcmp((const char*)pLeft->getData(), "START")){
+          // now do checking to make sure that neither are empty strings
+          if (!strcmp((const char*)pLeft->getData(), "") || !strcmp((const char*)pLeft->getData(), ""))
+            return;
+          // if strings are not uninitialized and not null, add them to the csv
+          char buf[100];
+          sprintf(buf, "%s,%s\n", (const char*)pLeft->getData(), (const char*)pRight->getData());
+          appendFile(SD, fileToWrite, buf);
+          Serial.println(fileToWrite);
+          Serial.printf("Appending to file %s", buf);
+        }
       } else {
-        Serial.println("FAILED TO CONNECT TO SERVER.");
-      }
-      doConnect = false;
-    }
-
-    // If we are connected to a peer BLE Server, update the characteristic each time we are reached
-    // with the current time since boot.
-    if (connected) {
-      String newValue = "Time since boot: " + String(millis()/1000);
-      Serial.println("Setting new characteristic value to \"" + newValue + "\"");
-      
-      // Set the characteristic's value to be the array of bytes that is actually a string.
-      pRemoteCharacteristic->writeValue(newValue.c_str(), newValue.length());
-    }
-  } else {
-      if (pClient)
-        pClient->disconnect(); // disconnecting from leg processors
-      pClient = NULL; // trying to stop issue of disconnecting multiple times
-
-      // notify changed value
-      if (deviceConnected) {
-        // send first file over and delete it upon completion of reading it all
-        // NOTE: start here, not working with this code uncommented
+        // transmitting file to computer when available
+        // waiting for computer to become available
+        while (strcmp((const char*)pTransmit->getData(), "GOOD")) {
+          Serial.println("WAITING UNTIL GOOD");
+          delay(1);
+        }
         File file = SD.open(fileToWrite);
 
-        Serial.println((const char *)pLeg->getData());
-        if (!strcmp((const char *)pLeg->getData(), "START")) {
-          Serial.println("reading /session0.csv");
-          String buf;
-          char terminator = '\n';
-          while(file.available()) {
-            buf = file.readStringUntil(terminator);
-            Serial.print("Sent ");
-            Serial.println(buf);
-            pLeg->setValue(buf.c_str());
-            pLeg->notify();
+        Serial.println("reading /session0.csv");
+        String buf;
+        char terminator = '\n';
+        while(file.available()) {
+          buf = file.readStringUntil(terminator);
+          Serial.print("Sent ");
+          Serial.println(buf);
+          pTransmit->setValue(buf.c_str());
+          pTransmit->notify();
 
-            // waiting for reader to say they've received all the data
-            while(strcmp((const char *)pLeg->getData(), "GOOD")) {
-              // Serial.println("WAITING UNTIL GOOD");
-              delay(1);
-            }
-
-            delay(5);  // bluetooth stack will go into congestion, if too many packets
-                      // are sent, in 6 hours test i was able to go as low as 3ms
+          // waiting for reader to say they've received all the data
+          while(strcmp((const char *)pTransmit->getData(), "GOOD")) {
+            // Serial.println("WAITING UNTIL GOOD");
+            delay(1);
           }
-          Serial.print("Attempting to delete ");
-          Serial.println(file.name());
-          // delete file upon completion of transmission
-          deleteFile(SD, file.name());
-          pLeg->setValue("DONE");
-          pLeg->notify();
+
+          delay(5);  // bluetooth stack will go into congestion, if too many packets
+                    // are sent, in 6 hours test i was able to go as low as 3ms
         }
+        Serial.print("Attempting to delete ");
+        Serial.println(file.name());
+        // delete file upon completion of transmission
+        deleteFile(SD, file.name());
+        pTransmit->setValue("DONE");
+        pTransmit->notify();
         
       }
-      // disconnecting
-      if (!deviceConnected && oldDeviceConnected) {
-        delay(500);  // give the bluetooth stack the chance to get things ready
-        pLeg->setValue("START");
-        pLeg->notify();
-        pServer->startAdvertising();  // restart advertising
-        Serial.println("Stopped run, waiting for chance to transmit");
-        Serial.println("start advertising");
-        oldDeviceConnected = deviceConnected;
-      }
-      // connecting
-      if (deviceConnected && !oldDeviceConnected) {
-        // do stuff here on connecting
-        oldDeviceConnected = deviceConnected;
-      }
-  }
+    }
+    // disconnecting
+    if (!deviceConnected && oldDeviceConnected) {
+      delay(500);  // give the bluetooth stack the chance to get things read
+      Serial.println("stopped transmitting, waiting to start reading data from BLE");
+      pLeft->setValue("START");
+      pLeft->notify();
+      pRight->setValue("START");
+      pServer->startAdvertising();  // start advertising
+      pLeft->notify();
+      oldDeviceConnected = deviceConnected;
+    }
+    // connecting
+    if (deviceConnected && !oldDeviceConnected) {
+      // do stuff here on connecting
+      oldDeviceConnected = deviceConnected;
+    }
   
-  delay(500); // Delay half a second between loops.
+  delay(67); // Delay half a second between loops.
 } // End of loop
