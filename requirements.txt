@@ -1,0 +1,14 @@
+async-timeout==4.0.3
+beautifulsoup4==4.12.2
+bleak==0.21.1
+google==3.0.0
+numpy==1.24.4
+protobuf==4.25.0
+pygame==2.5.2
+pyobjc-core==9.2
+pyobjc-framework-Cocoa==9.2
+pyobjc-framework-CoreBluetooth==9.2
+pyobjc-framework-libdispatch==9.2
+pyserial==3.5
+soupsieve==2.5
+typing_extensions==4.8.0
