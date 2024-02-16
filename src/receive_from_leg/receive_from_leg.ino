@@ -495,6 +495,7 @@ void loop() {
           char buf[100];
           sprintf(buf, "%s,%s\n", (const char*)pLeft->getData(), (const char*)pRight->getData());
           appendFile(SD, fileToWrite, buf);
+          // pTransmit->setValue(buf);
           Serial.println(fileToWrite);
           Serial.printf("Appending to file %s", buf);
         }
@@ -503,14 +504,19 @@ void loop() {
         // waiting for computer to become available
         while (strcmp((const char*)pTransmit->getData(), "GOOD")) {
           Serial.println("WAITING UNTIL GOOD");
-          delay(1);
+          delay(500);
+          if (buttonState == HIGH && lastButtonState == LOW) {
+            // turn LED on:
+            receive = !receive;
+            digitalWrite(ledPin, receive);
+          }
         }
         File file = SD.open(fileToWrite);
 
         Serial.println("reading /session0.csv");
         String buf;
         char terminator = '\n';
-        while(file.available()) {
+        while (file.available()) {
           buf = file.readStringUntil(terminator);
           Serial.print("Sent ");
           Serial.println(buf);
@@ -520,7 +526,7 @@ void loop() {
           // waiting for reader to say they've received all the data
           while(strcmp((const char *)pTransmit->getData(), "GOOD")) {
             // Serial.println("WAITING UNTIL GOOD");
-            delay(1);
+            delay(5);
           }
 
           delay(5);  // bluetooth stack will go into congestion, if too many packets
@@ -536,16 +542,16 @@ void loop() {
       }
     }
     // disconnecting
-    if (!deviceConnected && oldDeviceConnected) {
-      delay(500);  // give the bluetooth stack the chance to get things read
-      Serial.println("stopped transmitting, waiting to start reading data from BLE");
-      pLeft->setValue("START");
-      pLeft->notify();
-      pRight->setValue("START");
-      pServer->startAdvertising();  // start advertising
-      pLeft->notify();
-      oldDeviceConnected = deviceConnected;
-    }
+    // if (!deviceConnected && oldDeviceConnected) {
+    //   delay(500);  // give the bluetooth stack the chance to get things read
+    //   Serial.println("stopped transmitting, waiting to start reading data from BLE");
+    //   pLeft->setValue("START");
+    //   pLeft->notify();
+    //   pRight->setValue("START");
+    //   pServer->startAdvertising();  // start advertising
+    //   pLeft->notify();
+    //   oldDeviceConnected = deviceConnected;
+    // }
     // connecting
     if (deviceConnected && !oldDeviceConnected) {
       // do stuff here on connecting
@@ -553,4 +559,5 @@ void loop() {
     }
   
   delay(67); // Delay half a second between loops.
+  Serial.write(13);
 } // End of loop

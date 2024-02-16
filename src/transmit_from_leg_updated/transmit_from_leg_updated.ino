@@ -6,7 +6,9 @@
  */
 
 #include "BLEDevice.h"
-//#include "BLEScan.h"
+#include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BNO055.h>
 
 #define SERVERNAME "StrideSync"
 
@@ -24,6 +26,27 @@ static boolean connected = false;
 static boolean doScan = false;
 static BLERemoteCharacteristic* pRemoteCharacteristic;
 static BLEAdvertisedDevice* myDevice;
+
+// BNO055 data
+
+Adafruit_BNO055 bnoquad = Adafruit_BNO055(55,0x28);
+Adafruit_BNO055 bnoshin = Adafruit_BNO055(56,0x29);
+
+void setup_bno055() {
+  if(!bnoquad.begin()) //init bnoquad
+  {
+    Serial.print("Ooops, no BNO055.1 detected ... Check your wiring or I2C ADDR!");
+    while(1);
+  }
+  if(!bnoshin.begin()) //init bnoshin
+  {
+    Serial.print("Ooops, no BNO055.2 detected ... Check your wiring or I2C ADDR!");
+    while(1);
+  }
+  delay(1000);
+  bnoquad.setExtCrystalUse(true);
+  bnoshin.setExtCrystalUse(true);
+}
 
 static void notifyCallback(
   BLERemoteCharacteristic* pBLERemoteCharacteristic,
@@ -134,6 +157,8 @@ void setup() {
   Serial.println("Starting Arduino BLE Client application...");
   BLEDevice::init("");
 
+  setup_bno055();
+
   // Retrieve a Scanner and set the callback we want to use to be informed when we
   // have detected a new device.  Specify that we want active scanning and start the
   // scan to run for 5 seconds.
@@ -165,14 +190,32 @@ void loop() {
   // with the current time since boot.
   if (connected) {
     String newValue = "Time since boot: " + String(millis()/1000);
-    Serial.println("Setting new characteristic value to \"" + newValue + "\"");
+
+    sensors_event_t event; //new sensor event
+    bnoquad.getEvent(&event); //read bnoquad event
+    sensors_vec_t quad_ori;
+    memcpy(&quad_ori, &event.orientation, sizeof(sensors_vec_t));
+    bnoshin.getEvent(&event); //read bnoshin event
+    sensors_vec_t shin_ori;
+    memcpy(&shin_ori, &event.orientation, sizeof(sensors_vec_t));
+
+    Serial.println("Shin orientation: ");
+    Serial.print(shin_ori.x);
+    Serial.print(", ");
+    Serial.print(shin_ori.y);
+    Serial.print(", ");
+    Serial.println(shin_ori.z);
+
+    char buf[80] = {};
+
+    sprintf(buf, "%.2f,%.2f,%.2f,%.2f,%.2f,%.2f", shin_ori.x, shin_ori.y, shin_ori.z, quad_ori.x, quad_ori.y, quad_ori.z);
+
     
-    String buf_to_send = "180,180,180,180,180,180";
     // Set the characteristic's value to be the array of bytes that is actually a string.
-    pRemoteCharacteristic->writeValue(buf_to_send.c_str(), buf_to_send.length());
+    pRemoteCharacteristic->writeValue(buf, 80);
   }else if(doScan){
     BLEDevice::getScan()->start(0);  // this is just example to start scan after disconnect, most likely there is better way to do it in arduino
   }
   
-  delay(67); // Sample rate of 15Hz
+  delay(33); // Sample rate of 15Hz
 } // End of loop

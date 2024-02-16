@@ -124,7 +124,7 @@ async def main(address):
                 if left_leg_response.decode() == "GOOD":
                     continue
                 # write GOOD to client
-                print(f"Got {left_leg_response.decode()}")
+
                 # add data to file
                 try:
                     if left_leg_response.decode() != "DONE":
