@@ -19,7 +19,7 @@
 // The remote service we wish to connect to.
 static BLEUUID serviceUUID(SERVICE_UUID);
 // The characteristic of the remote service we are interested in.
-static BLEUUID    charUUID(RIGHT_UUID);
+static BLEUUID    charUUID(LEFT_UUID);
 
 static boolean doConnect = false;
 static boolean connected = false;
@@ -170,6 +170,9 @@ void setup() {
   pBLEScan->start(5, false);
 } // End of setup.
 
+void float2Bytes(byte bytes_temp[4],float float_variable){ 
+  memcpy(bytes_temp, (unsigned char*) (&float_variable), 4);
+}
 
 // This is the Arduino main loop function.
 void loop() {
@@ -191,28 +194,56 @@ void loop() {
   if (connected) {
     String newValue = "Time since boot: " + String(millis()/1000);
 
-    sensors_event_t event; //new sensor event
-    bnoquad.getEvent(&event); //read bnoquad event
-    sensors_vec_t quad_ori;
-    memcpy(&quad_ori, &event.orientation, sizeof(sensors_vec_t));
-    bnoshin.getEvent(&event); //read bnoshin event
-    sensors_vec_t shin_ori;
-    memcpy(&shin_ori, &event.orientation, sizeof(sensors_vec_t));
+    // get quaternion data, convert to Euler
+    // @note: Do this to get around Euler issues with BNO055, forums say this should work fine
+    imu::Quaternion quad_quat = bnoquad.getQuat();
+    imu::Quaternion shin_quat = bnoshin.getQuat();
+
+    // Serial.println("quad orientation: ");
+    // Serial.print(quad_quat.w());
+    // Serial.print(", ");
+    // Serial.print(quad_quat.x());
+    // Serial.print(", ");
+    // Serial.print(quad_quat.y());
+    // Serial.print(", ");
+    // Serial.println(quad_quat.z());
+
+    imu::Vector<3> quad_ori = quad_quat.toEuler();
+    imu::Vector<3> shin_ori = shin_quat.toEuler();
 
     Serial.println("Shin orientation: ");
-    Serial.print(shin_ori.x);
+    Serial.print(shin_ori.x()*RAD_TO_DEG);
     Serial.print(", ");
-    Serial.print(shin_ori.y);
+    Serial.print(shin_ori.y()*RAD_TO_DEG);
     Serial.print(", ");
-    Serial.println(shin_ori.z);
+    Serial.println(shin_ori.z()*RAD_TO_DEG);
 
-    char buf[80] = {};
+    // Serial.println("Quad orientation: ");
+    // Serial.print(quad_ori.x());
+    // Serial.print(", ");
+    // Serial.print(quad_ori.y());
+    // Serial.print(", ");
+    // Serial.println(quad_ori.z());
 
-    sprintf(buf, "%.2f,%.2f,%.2f,%.2f,%.2f,%.2f", shin_ori.x, shin_ori.y, shin_ori.z, quad_ori.x, quad_ori.y, quad_ori.z);
+    // initialize list of bytes that will be transmitted
+    const int8_t num_floats_to_transmit = 6;
+    byte orientation_bytes[sizeof(float)*num_floats_to_transmit] = {};
+
+    float floats_to_send[6] = {shin_ori.x(), shin_ori.y(), shin_ori.z(), quad_ori.x(), quad_ori.y(), quad_ori.z()};
+
+    // adding each value to buffer
+    for (int8_t ii; ii < num_floats_to_transmit; ii++) {
+      byte* orientation_float = &orientation_bytes[sizeof(float)*ii];
+      float2Bytes(orientation_float, floats_to_send[ii]);
+    }
+
+    // char buf[80] = {};
+
+    // sprintf(buf, "%.2f,%.2f,%.2f,%.2f,%.2f,%.2f", shin_ori.x(), shin_ori.y(), shin_ori.z(), quad_ori.x(), quad_ori.y(), quad_ori.z());
 
     
     // Set the characteristic's value to be the array of bytes that is actually a string.
-    pRemoteCharacteristic->writeValue(buf, 80);
+    pRemoteCharacteristic->writeValue(orientation_bytes, sizeof(float)*num_floats_to_transmit);
   }else if(doScan){
     BLEDevice::getScan()->start(0);  // this is just example to start scan after disconnect, most likely there is better way to do it in arduino
   }

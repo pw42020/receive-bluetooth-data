@@ -13,9 +13,11 @@ and data is saved in the .run file as:
     l_shank_x,l_shank_y,l_shank_z,l_thigh_x,l_thigh_y,l_thigh_z,r_shank_x,r_shank_y,r_shank_z,r_thigh_x,r_thigh_y,r_thigh_z
 
 """
+
 import sys
 import os
 import time
+import struct
 from pathlib import Path
 import asyncio
 import logging
@@ -53,6 +55,8 @@ NAME = "StrideSync"
 LEG_ID = "beb5483e-36e1-4688-b7f5-ea07361b26a8"
 
 CHANNEL_NAME = "4BE89814-827A-7A33-0672-DE98DFF5888D"
+
+NUM_FLOATS_TRANSMITTED: Final[int] = 6
 
 SAMPLES_PER_SECOND: Final[int] = 15
 
@@ -120,15 +124,17 @@ async def main(address):
                 )
             )
             while True:
-                left_leg_response: Final[str] = await client.read_gatt_char(LEG_ID)
-                if left_leg_response.decode() == "GOOD":
+                leg_response: Final[bytearray] = await client.read_gatt_char(LEG_ID)
+                if leg_response.decode() == "GOOD":
                     continue
-                # write GOOD to client
-                print(f"Got {left_leg_response.decode()}")
+
                 # add data to file
                 try:
-                    if left_leg_response.decode() != "DONE":
-                        file_lines.append(left_leg_response.decode() + "\n")
+                    if leg_response.decode() != "DONE":
+                        file_lines.append(
+                            struct.unpack("%sf" % NUM_FLOATS_TRANSMITTED, leg_response)
+                            + "\n"
+                        )
                     else:
                         log.info("DONE")
                         break
@@ -136,7 +142,7 @@ async def main(address):
                 except Exception as e:
                     log.error("Error: %s", e)
 
-                if left_leg_response.decode() != "DONE":
+                if leg_response.decode() != "DONE":
                     await client.write_gatt_char(LEG_ID, b"GOOD")
 
                 # give time for program to send more packets
@@ -152,7 +158,6 @@ async def main(address):
 
 if __name__ == "__main__":
     asyncio.run(main(CHANNEL_NAME))
-    # file = create_run_file()
     # file.write(
     #     "".join(
     #         [

@@ -413,7 +413,7 @@ void setup() {
   Serial.begin(115200);
 
   // initializing MicroSD card
-  setupMicroSD();
+  // setupMicroSD();
   
 
   // setting up BLE Application
@@ -494,7 +494,7 @@ void loop() {
           // if strings are not uninitialized and not null, add them to the csv
           char buf[100];
           sprintf(buf, "%s,%s\n", (const char*)pLeft->getData(), (const char*)pRight->getData());
-          appendFile(SD, fileToWrite, buf);
+          // appendFile(SD, fileToWrite, buf);
           // pTransmit->setValue(buf);
           Serial.println(fileToWrite);
           Serial.printf("Appending to file %s", buf);
