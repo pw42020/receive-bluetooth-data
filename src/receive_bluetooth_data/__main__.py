@@ -17,6 +17,7 @@ and data is saved in the .run file as:
 import sys
 import os
 import time
+import math
 import struct
 from pathlib import Path
 import asyncio
@@ -125,24 +126,34 @@ async def main(address):
             )
             while True:
                 leg_response: Final[bytearray] = await client.read_gatt_char(LEG_ID)
-                if leg_response.decode() == "GOOD":
-                    continue
+                try:
+                    if leg_response.decode() == "GOOD":
+                        continue
+                except Exception as e:
+                    log.error("Error: %s", e)
+
+                print(leg_response)
+                try:
+                    if leg_response.decode() != "DONE" or leg_response.decode() == "":
+                        await client.write_gatt_char(LEG_ID, b"GOOD")
+                        continue
+                except Exception as e:
+                    log.error("Error: %s", e)
 
                 # add data to file
                 try:
                     if leg_response.decode() != "DONE":
-                        file_lines.append(
-                            struct.unpack("%sf" % NUM_FLOATS_TRANSMITTED, leg_response)
-                            + "\n"
-                        )
+                        float_list = struct.unpack("%sf" % 12, bytearray(leg_response))
+                        file_lines.append(",".join(str(e) for e in float_list) + "\n")
+                        await client.write_gatt_char(LEG_ID, b"GOOD")
                     else:
                         log.info("DONE")
                         break
                     # time.sleep(0.005)
                 except Exception as e:
-                    log.error("Error: %s", e)
-
-                if leg_response.decode() != "DONE":
+                    float_list = struct.unpack("%sf" % 12, bytearray(leg_response))
+                    print(float_list)
+                    file_lines.append(",".join(str(e) for e in float_list) + "\n")
                     await client.write_gatt_char(LEG_ID, b"GOOD")
 
                 # give time for program to send more packets

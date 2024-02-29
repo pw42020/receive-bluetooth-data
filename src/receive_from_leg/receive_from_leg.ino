@@ -33,6 +33,8 @@ bool oldDeviceConnected = false;
 #define TRANSMIT_SERVICE_UUID "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define TRANSMIT_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
 
+#define NUM_FLOATS 6
+
 const int buttonPin = 0;
 const int ledPin = A2;    // the number of the LED pin
 
@@ -52,7 +54,7 @@ int receive = 1;
 BLEClient*  pClient;
 
 
-char * fileToWrite = "/session0.csv";
+char * fileToWrite = "/session0.txt";
 
 /** All information regarding SD card write and read **/
 
@@ -138,7 +140,7 @@ void writeFile(fs::FS &fs, const char * path, const char * message){
 }
 
 void appendFile(fs::FS &fs, const char * path, const char * message){
-    Serial.printf("Appending to file: %s\n", path);
+    Serial.printf("Appending to file: %s\n", message);
 
     File file = fs.open(path, FILE_APPEND);
     if(!file){
@@ -330,15 +332,15 @@ void openNewFileToWrite() {
   }
 
   if (file == NULL) {
-    fileToWrite = "/session0.csv";
+    fileToWrite = "/session0.txt";
   } else {
     // creating file of newest number (i.e. 1->2, 12->13, etc)
     std::string filename = file.name();
 
     fileToWrite = "/";
 
-    // remove '/' and '.csv'
-    sprintf(fileToWrite, "/session%d.csv", atoi(filename.substr(8, filename.size() - 4).c_str()) + 1);
+    // remove '/' and '.txt'
+    sprintf(fileToWrite, "/session%d.txt", atoi(filename.substr(8, filename.size() - 4).c_str()) + 1);
     writeFile(SD, fileToWrite, "");
   }
   Serial.print("Created file named ");
@@ -380,6 +382,8 @@ void setupMicroSD() {
       Serial.println("Card Mount Failed");
       return;
   }
+  
+  Serial.println("Card mount successful");
   uint8_t cardType = SD.cardType();
 
   if(cardType == CARD_NONE){
@@ -404,6 +408,8 @@ void setupMicroSD() {
   readFile(SD, "/hello.txt");
   deleteFile(SD, "/hello.txt");
   writeFile(SD, fileToWrite, "");
+
+  Serial.println("Got through initialization routine routine");
   
   return;
 }
@@ -413,7 +419,7 @@ void setup() {
   Serial.begin(115200);
 
   // initializing MicroSD card
-  // setupMicroSD();
+  setupMicroSD();
   
 
   // setting up BLE Application
@@ -472,6 +478,9 @@ void setup() {
   Serial.println("Started advertising.");
 } // End of setup.
 
+void float2Bytes(byte bytes_temp[4],float float_variable){ 
+  memcpy(bytes_temp, (unsigned char*) (&float_variable), 4);
+}
 
 // This is the Arduino main loop function.
 void loop() {
@@ -491,10 +500,65 @@ void loop() {
           // now do checking to make sure that neither are empty strings
           if (!strcmp((const char*)pLeft->getData(), "") || !strcmp((const char*)pLeft->getData(), ""))
             return;
-          // if strings are not uninitialized and not null, add them to the csv
-          char buf[100];
-          sprintf(buf, "%s,%s\n", (const char*)pLeft->getData(), (const char*)pRight->getData());
-          // appendFile(SD, fileToWrite, buf);
+          // if strings are not uninitialized and not null, add them to the txt
+          char buf[2*NUM_FLOATS*sizeof(float)];
+          // sprintf(buf, "%s,%s\n", (const char*)pLeft->getData(), (const char*)pRight->getData());
+          // char buffer[30];
+          // sprintf(buffer, "with %%p:  buf    = %p\n", &buf);
+          // Serial.print(buffer);
+          // sprintf(buffer, "with %%p:  buf[6]    = %p\n", &buf[sizeof(float)*NUM_FLOATS]);
+          // Serial.print(buffer);
+
+          memcpy(&buf, pLeft->getData(), sizeof(float)*NUM_FLOATS);
+          memcpy(&buf[sizeof(float)*NUM_FLOATS], (const char*)pRight->getData(), sizeof(float)*NUM_FLOATS);
+
+          float float_array[2*NUM_FLOATS] = {};
+          memcpy(&float_array, &buf, 2*sizeof(float)*NUM_FLOATS);
+
+          // Serial.print("Retrieved ");
+          // Serial.print(float_array[0]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[1]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[2]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[3]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[4]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[5]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[6]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[7]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[8]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[9]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[10]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.println(float_array[11]*RAD_TO_DEG);
+
+          char buffer[100]; 
+
+          sprintf(buffer, "%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\n",
+            float_array[0]*RAD_TO_DEG,
+            float_array[1]*RAD_TO_DEG,
+            float_array[2]*RAD_TO_DEG,
+            float_array[3]*RAD_TO_DEG,
+            float_array[4]*RAD_TO_DEG,
+            float_array[5]*RAD_TO_DEG,
+            float_array[6]*RAD_TO_DEG,
+            float_array[7]*RAD_TO_DEG,
+            float_array[8]*RAD_TO_DEG,
+            float_array[9]*RAD_TO_DEG,
+            float_array[10]*RAD_TO_DEG,
+            float_array[11]*RAD_TO_DEG
+            );
+
+
+          appendFile(SD, fileToWrite, buffer);
           // pTransmit->setValue(buf);
           Serial.println(fileToWrite);
           Serial.printf("Appending to file %s", buf);
@@ -513,14 +577,56 @@ void loop() {
         }
         File file = SD.open(fileToWrite);
 
-        Serial.println("reading /session0.csv");
+        Serial.println("reading /session0.txt");
         String buf;
         char terminator = '\n';
         while (file.available()) {
-          buf = file.readStringUntil(terminator);
+          String string_buf = file.readStringUntil(terminator);
+          char *ptr = NULL;
+
+          char buf[string_buf.length() + 1] = {};
+
+          string_buf.toCharArray(buf, string_buf.length());
+
+          // convert bytes to float so we can read them
+          float float_array[2*NUM_FLOATS] = {};
+          byte index = 0;
+          ptr = strtok(buf, ",");
+          while(ptr != NULL)
+          {
+              float_array[index] = atof(ptr);
+              index++;
+              ptr = strtok(NULL, ",");
+          }
           Serial.print("Sent ");
-          Serial.println(buf);
-          pTransmit->setValue(buf.c_str());
+          Serial.println(string_buf);
+          // Serial.print(float_array[0]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[1]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[2]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[3]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[4]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[5]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[6]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[7]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[8]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[9]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[10]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.println(float_array[11]*RAD_TO_DEG);
+
+          // Serial.print("Sent ");
+          // Serial.println(buf);
+          pTransmit->setValue((unsigned char *)float_array, 2*sizeof(float)*NUM_FLOATS);
           pTransmit->notify();
 
           // waiting for reader to say they've received all the data

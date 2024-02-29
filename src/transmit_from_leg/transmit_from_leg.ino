@@ -10,6 +10,8 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BNO055.h>
 
+#define NUM_FLOATS 6
+
 #define SERVERNAME "StrideSync"
 
 #define SERVICE_UUID "a26972ba-affb-420f-8b53-0db2d9124395"
@@ -226,24 +228,18 @@ void loop() {
     // Serial.println(quad_ori.z());
 
     // initialize list of bytes that will be transmitted
-    const int8_t num_floats_to_transmit = 6;
-    byte orientation_bytes[sizeof(float)*num_floats_to_transmit] = {};
+    byte orientation_bytes[sizeof(float)*NUM_FLOATS] = {};
 
-    float floats_to_send[6] = {shin_ori.x(), shin_ori.y(), shin_ori.z(), quad_ori.x(), quad_ori.y(), quad_ori.z()};
+    float floats_to_send[NUM_FLOATS] = {shin_ori.x(), shin_ori.y(), shin_ori.z(), quad_ori.x(), quad_ori.y(), quad_ori.z()};
 
     // adding each value to buffer
-    for (int8_t ii; ii < num_floats_to_transmit; ii++) {
+    for (int8_t ii; ii < NUM_FLOATS; ii++) {
       byte* orientation_float = &orientation_bytes[sizeof(float)*ii];
       float2Bytes(orientation_float, floats_to_send[ii]);
     }
 
-    // char buf[80] = {};
-
-    // sprintf(buf, "%.2f,%.2f,%.2f,%.2f,%.2f,%.2f", shin_ori.x(), shin_ori.y(), shin_ori.z(), quad_ori.x(), quad_ori.y(), quad_ori.z());
-
-    
     // Set the characteristic's value to be the array of bytes that is actually a string.
-    pRemoteCharacteristic->writeValue(orientation_bytes, sizeof(float)*num_floats_to_transmit);
+    pRemoteCharacteristic->writeValue(orientation_bytes, sizeof(float)*NUM_FLOATS);
   }else if(doScan){
     BLEDevice::getScan()->start(0);  // this is just example to start scan after disconnect, most likely there is better way to do it in arduino
   }
