@@ -1,19 +1,3 @@
-"""
-SDP Team 1
-Author: Patrick Walsh
-Python main program for receiving bluetooth data from ESP32.
-
-Notes
------
-The format of the incoming bluetooth data is a string of comma separated
-values as:
-    <l_shank_x>,<l_shank_y>,<l_shank_z>,<l_thigh_x>,<l_thigh_y>,<l_thigh_z>
-
-and data is saved in the .run file as:
-    l_shank_x,l_shank_y,l_shank_z,l_thigh_x,l_thigh_y,l_thigh_z,r_shank_x,r_shank_y,r_shank_z,r_thigh_x,r_thigh_y,r_thigh_z
-
-"""
-
 import sys
 import os
 import time
@@ -83,8 +67,19 @@ def create_run_file() -> TextIO:
     return open(f"{run_folder}/{folder_name}/data.run", "w")
 
 
-async def main(address):
+async def main(address) -> None:
     """main function for receiving bluetooth data from ESP32
+
+    > The Algorithm works as follows:
+    1. Discover all devices
+    2. Connect to the device
+    3. Read data from the device
+    4. Write data to file
+
+    **Notes**
+    - The data is read from the device in the form of bytes, four bytes for each float
+    - The data is written to the file in the form of a string of comma separated values
+
 
     Parameters
     ----------
@@ -108,7 +103,7 @@ async def main(address):
     async with BleakClient(chosen_device.address) as client:
         # read data from bluetooth
         # read all of client's characteristics
-        log.info("Connected: %s", await client.is_connected())
+        log.info("Connected: %s", client.is_connected)
         file_lines: list[str] = []
         # print all services
         for service in client.services:
@@ -130,7 +125,8 @@ async def main(address):
                     if leg_response.decode() == "GOOD":
                         continue
                 except Exception as e:
-                    log.error("Error: %s", e)
+                    # log.error("Error: %s", e)
+                    pass
 
                 print(leg_response)
                 try:

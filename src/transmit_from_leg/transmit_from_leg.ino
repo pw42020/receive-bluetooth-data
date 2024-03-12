@@ -21,7 +21,7 @@
 // The remote service we wish to connect to.
 static BLEUUID serviceUUID(SERVICE_UUID);
 // The characteristic of the remote service we are interested in.
-static BLEUUID    charUUID(LEFT_UUID);
+static BLEUUID    charUUID(RIGHT_UUID);
 
 static boolean doConnect = false;
 static boolean connected = false;
@@ -31,19 +31,39 @@ static BLEAdvertisedDevice* myDevice;
 
 // BNO055 data
 
-Adafruit_BNO055 bnoquad = Adafruit_BNO055(55,0x28);
-Adafruit_BNO055 bnoshin = Adafruit_BNO055(56,0x29);
+Adafruit_BNO055 bnoquad = Adafruit_BNO055(55,0x29);
+Adafruit_BNO055 bnoshin = Adafruit_BNO055(56,0x28);
 
 void setup_bno055() {
+  bool run = true;
   if(!bnoquad.begin()) //init bnoquad
   {
-    Serial.print("Ooops, no BNO055.1 detected ... Check your wiring or I2C ADDR!");
-    while(1);
+    Serial.print("Ooops, no BNO055.1 for quad detected ... Check your wiring or I2C ADDR!");
+    run = false;
   }
   if(!bnoshin.begin()) //init bnoshin
   {
-    Serial.print("Ooops, no BNO055.2 detected ... Check your wiring or I2C ADDR!");
-    while(1);
+    Serial.print("Ooops, no BNO055.2 for shin detected ... Check your wiring or I2C ADDR!");
+    run = false;
+  }
+  if (!run) {
+    while(1) {
+      imu::Quaternion shin_quat = bnoshin.getQuat();
+
+      Serial.println("shin orientation: ");
+      Serial.print(shin_quat.w());
+      Serial.print(", ");
+      Serial.print(shin_quat.x());
+      Serial.print(", ");
+      Serial.print(shin_quat.y());
+      Serial.print(", ");
+      Serial.println(shin_quat.z());
+
+      delay(50);
+    }
+    // while(1);
+  } else {
+    Serial.println("GOOD!!!!");
   }
   delay(1000);
   bnoquad.setExtCrystalUse(true);
@@ -156,6 +176,9 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
 
 void setup() {
   Serial.begin(115200);
+
+  while (!Serial);
+  
   Serial.println("Starting Arduino BLE Client application...");
   BLEDevice::init("");
 
@@ -213,6 +236,9 @@ void loop() {
     imu::Vector<3> quad_ori = quad_quat.toEuler();
     imu::Vector<3> shin_ori = shin_quat.toEuler();
 
+    quad_ori.normalize();
+    shin_ori.normalize();
+
     Serial.println("Shin orientation: ");
     Serial.print(shin_ori.x()*RAD_TO_DEG);
     Serial.print(", ");
@@ -220,12 +246,12 @@ void loop() {
     Serial.print(", ");
     Serial.println(shin_ori.z()*RAD_TO_DEG);
 
-    // Serial.println("Quad orientation: ");
-    // Serial.print(quad_ori.x());
-    // Serial.print(", ");
-    // Serial.print(quad_ori.y());
-    // Serial.print(", ");
-    // Serial.println(quad_ori.z());
+    Serial.println("Quad orientation: ");
+    Serial.print(quad_ori.x()*RAD_TO_DEG);
+    Serial.print(", ");
+    Serial.print(quad_ori.y()*RAD_TO_DEG);
+    Serial.print(", ");
+    Serial.println(quad_ori.z()*RAD_TO_DEG);
 
     // initialize list of bytes that will be transmitted
     byte orientation_bytes[sizeof(float)*NUM_FLOATS] = {};
