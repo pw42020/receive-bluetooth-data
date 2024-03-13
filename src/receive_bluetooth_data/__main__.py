@@ -114,8 +114,8 @@ async def main(address) -> None:
             file_lines.append(
                 "".join(
                     [
-                        "l_thigh_x,l_thigh_y,l_thigh_z,l_shank_x,l_shank_y,l_shank_z,",
-                        "r_thigh_x,r_thigh_y,r_thigh_z,r_shank_x,r_shank_y,r_shank_z\n",
+                        "l_shank_x,l_shank_y,l_shank_z,l_thigh_x,l_thigh_y,l_thigh_z,",
+                        "r_shank_x,r_shank_y,r_shank_z,r_thigh_x,r_thigh_y,r_thigh_z\n",
                     ]
                 )
             )
@@ -128,13 +128,13 @@ async def main(address) -> None:
                     # log.error("Error: %s", e)
                     pass
 
-                print(leg_response)
                 try:
                     if leg_response.decode() != "DONE" or leg_response.decode() == "":
                         await client.write_gatt_char(LEG_ID, b"GOOD")
                         continue
                 except Exception as e:
-                    log.error("Error: %s", e)
+                    # log.error("Error: %s", e)
+                    pass
 
                 # add data to file
                 try:
@@ -147,8 +147,9 @@ async def main(address) -> None:
                         break
                     # time.sleep(0.005)
                 except Exception as e:
+                    print("receiving...")
                     float_list = struct.unpack("%sf" % 12, bytearray(leg_response))
-                    print(float_list)
+                    # print(float_list)
                     file_lines.append(",".join(str(e) for e in float_list) + "\n")
                     await client.write_gatt_char(LEG_ID, b"GOOD")
 

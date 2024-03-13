@@ -236,8 +236,8 @@ void loop() {
     imu::Vector<3> quad_ori = quad_quat.toEuler();
     imu::Vector<3> shin_ori = shin_quat.toEuler();
 
-    quad_ori.normalize();
-    shin_ori.normalize();
+    // quad_ori.normalize();
+    // shin_ori.normalize();
 
     Serial.println("Shin orientation: ");
     Serial.print(shin_ori.x()*RAD_TO_DEG);
