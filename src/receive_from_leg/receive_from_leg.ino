@@ -43,6 +43,10 @@ bool oldDeviceConnected = false;
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
+#define RED_LED A3
+#define GREEN_LED A2
+#define BUTTON A0
+
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
 // The pins for I2C are defined by the Wire-library. 
 // On an arduino UNO:       A4(SDA), A5(SCL)
@@ -51,9 +55,6 @@ bool oldDeviceConnected = false;
 #define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 #define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-
-const int buttonPin = 0;
-const int ledPin = A2;    // the number of the LED pin
 
 static BLEUUID serviceUUID(SERVICE_UUID);
 // The characteristic of the remote service we are interested in.
@@ -119,6 +120,8 @@ void refreshDisplay(char *buffer)
 void setup() {
   Serial.begin(115200);
 
+  while (!Serial);
+
   // setting up BLE Application
   Serial.println("Starting Arduino BLE Server application...");
   BLEDevice::init("StrideSync");
@@ -179,7 +182,9 @@ void setup() {
       0x0);  // set value to 0x00 to not advertise this parameter
   
   // set up pushbutton to turn on or off transmission
-  pinMode(buttonPin, INPUT_PULLUP);
+  pinMode(BUTTON, INPUT);
+  pinMode(GREEN_LED, OUTPUT);
+  pinMode(RED_LED, OUTPUT);
   BLEDevice::startAdvertising();
   Serial.println("Started advertising.");
 } // End of setup.
@@ -187,14 +192,16 @@ void setup() {
 // This is the Arduino main loop function.
 void loop() {
   lastButtonState = buttonState;
-  buttonState = digitalRead(buttonPin);
+  buttonState = digitalRead(BUTTON);
 
   // check if the pushbutton is pressed. If it is, the buttonState is HIGH:
   if (buttonState == HIGH && lastButtonState == LOW) {
     // turn LED on:
     receive = !receive;
     started = false;
-    digitalWrite(ledPin, receive);
+    digitalWrite(RED_LED, HIGH);
+    delay(1000);
+    digitalWrite(RED_LED, LOW);
   }
 
   if (deviceConnected) {
@@ -213,6 +220,11 @@ void loop() {
           if (SECONDS_IN_MINUTE*MAX_NUM_MINUTES*SAMPLES_PER_SECOND <= num_samples_received) {
             refreshDisplay("max samples\nreceived");
             return;
+          }
+          if (!started) {
+            digitalWrite(GREEN_LED, HIGH);
+            delay(1000);
+            digitalWrite(GREEN_LED, LOW);
           }
           started = true;
           char oled_buf[100];
@@ -252,10 +264,11 @@ void loop() {
           if (buttonState == HIGH && lastButtonState == LOW) {
             // turn LED on:
             receive = !receive;
-            digitalWrite(ledPin, receive);
+            digitalWrite(RED_LED, receive);
           }
         }
         // NOTE: CHANGE BACK TO i++
+        bool button_high = false;
         for (int64_t i = 0; i < num_samples_received; i++) {
           float * mini_float_buffer = (float*)float_buffer + 2*NUM_FLOATS*i;
 
@@ -288,6 +301,9 @@ void loop() {
           Serial.print(", ");
           Serial.println(mini_float_buffer[5 + 6]);
 
+          digitalWrite(GREEN_LED, button_high);
+          button_high = !button_high;
+
           pTransmit->setValue((unsigned char*)mini_float_buffer, 2*NUM_FLOATS*sizeof(float));
           pTransmit->notify();
           Serial.println("Transmitting");
@@ -307,7 +323,10 @@ void loop() {
         pTransmit->setValue("DONE");
         pTransmit->notify();
         refreshDisplay("Done.");
+        digitalWrite(GREEN_LED, HIGH);
         delay(3000);
+        digitalWrite(GREEN_LED, LOW);
+        digitalWrite(RED_LED, LOW);
         receive = !receive;
         refreshDisplay("Run not\nstarted.");
         pLeft->setValue("START");
