@@ -120,7 +120,7 @@ void refreshDisplay(char *buffer)
 void setup() {
   Serial.begin(115200);
 
-  while (!Serial);
+  // while (!Serial);
 
   // setting up BLE Application
   Serial.println("Starting Arduino BLE Server application...");
