@@ -288,18 +288,18 @@ void loop() {
           char string_buffer[100]; 
 
           sprintf(string_buffer, "%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\n",
-            mini_float_buffer[0]*RAD_TO_DEG,
-            mini_float_buffer[1]*RAD_TO_DEG,
-            mini_float_buffer[2]*RAD_TO_DEG,
-            mini_float_buffer[3]*RAD_TO_DEG,
-            mini_float_buffer[4]*RAD_TO_DEG,
-            mini_float_buffer[5]*RAD_TO_DEG,
-            mini_float_buffer[6]*RAD_TO_DEG,
-            mini_float_buffer[7]*RAD_TO_DEG,
-            mini_float_buffer[8]*RAD_TO_DEG,
-            mini_float_buffer[9]*RAD_TO_DEG,
-            mini_float_buffer[10]*RAD_TO_DEG,
-            mini_float_buffer[11]*RAD_TO_DEG
+            mini_float_buffer[0],
+            mini_float_buffer[1],
+            mini_float_buffer[2],
+            mini_float_buffer[3],
+            mini_float_buffer[4],
+            mini_float_buffer[5],
+            mini_float_buffer[6],
+            mini_float_buffer[7],
+            mini_float_buffer[8],
+            mini_float_buffer[9],
+            mini_float_buffer[10],
+            mini_float_buffer[11]
             );
 
 
