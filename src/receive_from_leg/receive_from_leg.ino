@@ -70,6 +70,7 @@ int lastButtonState = 1;
 int receive = 1;
 
 bool started = false;
+char * fileToWrite = "/session0.txt";
 
 int64_t time_ms = 0;
 
@@ -80,6 +81,39 @@ int64_t num_samples_received = 0;
 BLEClient*  pClient;
 
 /** All information regarding SD card write and read **/
+
+void writeFile(fs::FS &fs, const char * path, const char * message){
+    Serial.printf("Writing file: %s\n", path);
+
+    File file = fs.open(path, FILE_WRITE);
+    if(!file){
+        Serial.println("Failed to open file for writing");
+        return;
+    }
+    if(file.print(message)){
+        Serial.println("File written");
+    } else {
+        Serial.println("Write failed");
+    }
+    file.close();
+}
+
+void appendFile(fs::FS &fs, const char * path, const char * message){
+    Serial.printf("Appending to file: %s\n", path);
+
+    File file = fs.open(path, FILE_APPEND);
+    if(!file){
+        Serial.println("Failed to open file for appending");
+        return;
+    }
+    if(file.print(message)){
+        Serial.println("Message appended");
+    } else {
+        Serial.println("Append failed");
+    }
+    file.close();
+}
+
 class MyServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) { 
     BLEDevice::startAdvertising();
@@ -120,7 +154,18 @@ void refreshDisplay(char *buffer)
 void setup() {
   Serial.begin(115200);
 
-  // while (!Serial);
+  while (!Serial);
+
+  pinMode(RX, OUTPUT);
+  if(!SD.begin(RX)){
+      Serial.println("Card Mount Failed");
+      return;
+  }
+
+  writeFile(SD, fileToWrite, "");
+
+  uint64_t cardSize = SD.cardSize() / (1024 * 1024);
+  Serial.printf("SD Card Size: %lluMB\n", cardSize);
 
   // setting up BLE Application
   Serial.println("Starting Arduino BLE Server application...");
@@ -135,6 +180,7 @@ void setup() {
   display.setCursor(0, 10);        // position to display
   refreshDisplay("Run not\nstarted.");
   display.display();               // show on OLED
+
   // Start advertising
   // Create the BLE Server
   pServer = BLEDevice::createServer();
@@ -239,6 +285,26 @@ void loop() {
           memcpy(mini_float_buffer, pLeft->getData(), NUM_FLOATS*sizeof(float));
           memcpy(mini_float_buffer + NUM_FLOATS, pRight->getData(), NUM_FLOATS*sizeof(float));
 
+          char string_buffer[100]; 
+
+          sprintf(string_buffer, "%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\n",
+            mini_float_buffer[0]*RAD_TO_DEG,
+            mini_float_buffer[1]*RAD_TO_DEG,
+            mini_float_buffer[2]*RAD_TO_DEG,
+            mini_float_buffer[3]*RAD_TO_DEG,
+            mini_float_buffer[4]*RAD_TO_DEG,
+            mini_float_buffer[5]*RAD_TO_DEG,
+            mini_float_buffer[6]*RAD_TO_DEG,
+            mini_float_buffer[7]*RAD_TO_DEG,
+            mini_float_buffer[8]*RAD_TO_DEG,
+            mini_float_buffer[9]*RAD_TO_DEG,
+            mini_float_buffer[10]*RAD_TO_DEG,
+            mini_float_buffer[11]*RAD_TO_DEG
+            );
+
+
+          appendFile(SD, fileToWrite, string_buffer);
+
           // Serial.print("Floats received from right: ");
           // Serial.print(last_six_floats[0]);
           // Serial.print(", ");
@@ -267,58 +333,72 @@ void loop() {
             digitalWrite(RED_LED, receive);
           }
         }
+        File file = SD.open(fileToWrite);
         // NOTE: CHANGE BACK TO i++
+        Serial.println("reading /session0.txt");
+        String buf;
+        char terminator = '\n';
         bool button_high = false;
-        for (int64_t i = 0; i < num_samples_received; i++) {
-          float * mini_float_buffer = (float*)float_buffer + 2*NUM_FLOATS*i;
+        while (file.available()) {
+          String string_buf = file.readStringUntil(terminator);
+          char *ptr = NULL;
 
-          char buf[100];
-          sprintf(buf, "mini_float_buffer: %p, mini_float_buffer + NUM_FLOATS*sizeof(float): %p", (const char*)mini_float_buffer, (const char*)mini_float_buffer + NUM_FLOATS*sizeof(float));
-          Serial.println(buf);
+          char buf[string_buf.length() + 1] = {};
 
-          Serial.print("Floats transmitting: ");
-          Serial.print(mini_float_buffer[0]);
-          Serial.print(", ");
-          Serial.print(mini_float_buffer[1]);
-          Serial.print(", ");
-          Serial.print(mini_float_buffer[2]);
-          Serial.print(", ");
-          Serial.print(mini_float_buffer[3]);
-          Serial.print(", ");
-          Serial.print(mini_float_buffer[4]);
-          Serial.print(", ");
-          Serial.print(mini_float_buffer[5]);
-          Serial.print(", ");
-          Serial.print(mini_float_buffer[0 + 6]);
-          Serial.print(", ");
-          Serial.print(mini_float_buffer[1 + 6]);
-          Serial.print(", ");
-          Serial.print(mini_float_buffer[2 + 6]);
-          Serial.print(", ");
-          Serial.print(mini_float_buffer[3 + 6]);
-          Serial.print(", ");
-          Serial.print(mini_float_buffer[4 + 6]);
-          Serial.print(", ");
-          Serial.println(mini_float_buffer[5 + 6]);
+          string_buf.toCharArray(buf, string_buf.length());
+
+          // convert bytes to float so we can read them
+          float float_array[2*NUM_FLOATS] = {};
+          byte index = 0;
+          ptr = strtok(buf, ",");
+          while(ptr != NULL)
+          {
+              float_array[index] = atof(ptr);
+              index++;
+              ptr = strtok(NULL, ",");
+          }
+          Serial.print("Sent ");
+          Serial.println(string_buf);
+          // Serial.print(float_array[0]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[1]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[2]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[3]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[4]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[5]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[6]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[7]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[8]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[9]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.print(float_array[10]*RAD_TO_DEG);
+          // Serial.print(", ");
+          // Serial.println(float_array[11]*RAD_TO_DEG);
+
+          // Serial.print("Sent ");
+          // Serial.println(buf);
+          pTransmit->setValue((unsigned char *)float_array, 2*sizeof(float)*NUM_FLOATS);
+          pTransmit->notify();
 
           digitalWrite(GREEN_LED, button_high);
           button_high = !button_high;
 
-          pTransmit->setValue((unsigned char*)mini_float_buffer, 2*NUM_FLOATS*sizeof(float));
-          pTransmit->notify();
-          Serial.println("Transmitting");
-          Serial.print("num_samples_received: ");
-          Serial.print(num_samples_received);
-          Serial.print(", i: ");
-          Serial.println(i);
-          sprintf(buf, "mini_float_buffer: %p\n", (const char*)mini_float_buffer);
-          Serial.println(buf);
-          refreshDisplay("Transfer\n-ing to\nPC...");
-
+          // waiting for reader to say they've received all the data
           while(strcmp((const char *)pTransmit->getData(), "GOOD")) {
             // Serial.println("WAITING UNTIL GOOD");
             delay(5);
           }
+
+          delay(5);  // bluetooth stack will go into congestion, if too many packets
+                    // are sent, in 6 hours test i was able to go as low as 3ms
         }
         pTransmit->setValue("DONE");
         pTransmit->notify();
