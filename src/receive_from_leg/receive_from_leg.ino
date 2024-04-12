@@ -20,8 +20,7 @@ BLEServer* pServer = NULL;
 BLECharacteristic* pTransmit = NULL;
 BLECharacteristic* pLeft = NULL;
 BLECharacteristic* pRight = NULL;
-bool deviceConnected = false;
-bool oldDeviceConnected = false;
+int devices_connected = 0;
 
 // information for receiving data
 #define leftLegBLESERVERNAME "STRIDESYNCLEGCPU_LEFT"
@@ -46,6 +45,7 @@ bool oldDeviceConnected = false;
 #define RED_LED A3
 #define GREEN_LED A2
 #define BUTTON A0
+#define BUTTON_STAY A1
 
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
 // The pins for I2C are defined by the Wire-library. 
@@ -117,19 +117,9 @@ void appendFile(fs::FS &fs, const char * path, const char * message){
 class MyServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) { 
     BLEDevice::startAdvertising();
-    deviceConnected = true; };
+    devices_connected += 1; };
 
-  void onDisconnect(BLEServer* pServer) { deviceConnected = false; }
-};
-
-class MyClientCallback : public BLEClientCallbacks {
-  void onConnect(BLEClient* pclient) {
-  }
-
-  void onDisconnect(BLEClient* pclient) {
-    connected = false;
-    Serial.println("onDisconnect");
-  }
+  void onDisconnect(BLEServer* pServer) { devices_connected -= 1; }
 };
 
 void setup_oled() 
@@ -171,6 +161,7 @@ void setup() {
   Serial.println("Starting Arduino BLE Server application...");
   BLEDevice::init("StrideSync");
 
+  // setup OLED
   setup_oled();
   delay(2000);         // wait for initializing
   display.clearDisplay(); // clear display
@@ -229,6 +220,9 @@ void setup() {
   
   // set up pushbutton to turn on or off transmission
   pinMode(BUTTON, INPUT);
+  // setting one side of the switch to high at all times
+  pinMode(BUTTON_STAY, OUTPUT);
+  digitalWrite(BUTTON_STAY, HIGH);
   pinMode(GREEN_LED, OUTPUT);
   pinMode(RED_LED, OUTPUT);
   BLEDevice::startAdvertising();
@@ -239,187 +233,196 @@ void setup() {
 void loop() {
   lastButtonState = buttonState;
   buttonState = digitalRead(BUTTON);
+  Serial.println(buttonState);
 
-  // check if the pushbutton is pressed. If it is, the buttonState is HIGH:
-  if (buttonState == HIGH && lastButtonState == LOW) {
+  /**
+  Method for the loop
+  1. Check if switch on or off
+  2. If switch on, wait for connection to legs and transmit
+  3. If switch off, say "StrideSync off" OR wait for transmit to computer
+  */
+
+  // show you are stopping the run
+  if (buttonState == LOW && lastButtonState == HIGH) {
     // turn LED on:
     receive = !receive;
-    started = false;
     digitalWrite(RED_LED, HIGH);
     delay(1000);
     digitalWrite(RED_LED, LOW);
   }
 
-  if (deviceConnected) {
-      if (receive) {
-        Serial.println("receiving");
-        float list_of_zeros[6] = {0, 0, 0, 0, 0, 0};
-        if (strcmp((const char*)pLeft->getData(), "START") && strcmp((const char*)pLeft->getData(), "START")){
-          // now do checking to make sure that neither are empty strings
-          // NOTE: CHANGE BACK TO || NOT &&
-          if (!strcmp((const char*)pLeft->getData(), "") || !strcmp((const char*)pLeft->getData(), "")){
-            if (started)
-              refreshDisplay(">=1 knee\nsleeve not\ntransmit");
-            else
-              return;
-          }
-          if (SECONDS_IN_MINUTE*MAX_NUM_MINUTES*SAMPLES_PER_SECOND <= num_samples_received) {
-            refreshDisplay("max samples\nreceived");
-            return;
-          }
-          if (!started) {
-            digitalWrite(GREEN_LED, HIGH);
-            delay(1000);
-            digitalWrite(GREEN_LED, LOW);
-          }
-          started = true;
-          char oled_buf[100];
-          sprintf(oled_buf, "Run start\nTime: %.2f", (float)time_ms/1000);
-          refreshDisplay(oled_buf);
-          time_ms += 67;
-          // if strings are not uninitialized and not null, add them to the csv
-          float *mini_float_buffer = (float*)float_buffer + 2*NUM_FLOATS*num_samples_received;
-          char buf[100];
-          sprintf(buf, "mini_float_buffer: %p, mini_float_buffer + NUM_FLOATS*sizeof(float): %p", (const char*)mini_float_buffer, (const char*)mini_float_buffer + NUM_FLOATS*sizeof(float));
-          Serial.println(buf);
-          memcpy(mini_float_buffer, pLeft->getData(), NUM_FLOATS*sizeof(float));
-          memcpy(mini_float_buffer + NUM_FLOATS, pRight->getData(), NUM_FLOATS*sizeof(float));
-
-          char string_buffer[100]; 
-
-          sprintf(string_buffer, "%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\n",
-            mini_float_buffer[0],
-            mini_float_buffer[1],
-            mini_float_buffer[2],
-            mini_float_buffer[3],
-            mini_float_buffer[4],
-            mini_float_buffer[5],
-            mini_float_buffer[6],
-            mini_float_buffer[7],
-            mini_float_buffer[8],
-            mini_float_buffer[9],
-            mini_float_buffer[10],
-            mini_float_buffer[11]
-            );
-
-
-          appendFile(SD, fileToWrite, string_buffer);
-
-          // Serial.print("Floats received from right: ");
-          // Serial.print(last_six_floats[0]);
-          // Serial.print(", ");
-          // Serial.print(last_six_floats[1]);
-          // Serial.print(", ");
-          // Serial.print(last_six_floats[2]);
-          // Serial.print(", ");
-          // Serial.print(last_six_floats[3]);
-          // Serial.print(", ");
-          // Serial.print(last_six_floats[4]);
-          // Serial.print(", ");
-          // Serial.println(last_six_floats[5]);
-
-          num_samples_received += 1;
-        }
-      } else {
-        // transmitting file to computer when available
-        // waiting for computer to become available
-        while (strcmp((const char*)pTransmit->getData(), "GOOD")) {
-          Serial.println("WAITING UNTIL GOOD");
-          refreshDisplay("Run stop\nTransfer\nto PC");
-          delay(500);
-          if (buttonState == HIGH && lastButtonState == LOW) {
-            // turn LED on:
-            receive = !receive;
-            digitalWrite(RED_LED, receive);
-          }
-        }
-        File file = SD.open(fileToWrite);
-        // NOTE: CHANGE BACK TO i++
-        Serial.println("reading /session0.txt");
-        String buf;
-        char terminator = '\n';
-        bool button_high = false;
-        while (file.available()) {
-          String string_buf = file.readStringUntil(terminator);
-          char *ptr = NULL;
-
-          char buf[string_buf.length() + 1] = {};
-
-          string_buf.toCharArray(buf, string_buf.length());
-
-          // convert bytes to float so we can read them
-          float float_array[2*NUM_FLOATS] = {};
-          byte index = 0;
-          ptr = strtok(buf, ",");
-          while(ptr != NULL)
-          {
-              float_array[index] = atof(ptr);
-              index++;
-              ptr = strtok(NULL, ",");
-          }
-          Serial.print("Sent ");
-          Serial.println(string_buf);
-          // Serial.print(float_array[0]*RAD_TO_DEG);
-          // Serial.print(", ");
-          // Serial.print(float_array[1]*RAD_TO_DEG);
-          // Serial.print(", ");
-          // Serial.print(float_array[2]*RAD_TO_DEG);
-          // Serial.print(", ");
-          // Serial.print(float_array[3]*RAD_TO_DEG);
-          // Serial.print(", ");
-          // Serial.print(float_array[4]*RAD_TO_DEG);
-          // Serial.print(", ");
-          // Serial.print(float_array[5]*RAD_TO_DEG);
-          // Serial.print(", ");
-          // Serial.print(float_array[6]*RAD_TO_DEG);
-          // Serial.print(", ");
-          // Serial.print(float_array[7]*RAD_TO_DEG);
-          // Serial.print(", ");
-          // Serial.print(float_array[8]*RAD_TO_DEG);
-          // Serial.print(", ");
-          // Serial.print(float_array[9]*RAD_TO_DEG);
-          // Serial.print(", ");
-          // Serial.print(float_array[10]*RAD_TO_DEG);
-          // Serial.print(", ");
-          // Serial.println(float_array[11]*RAD_TO_DEG);
-
-          // Serial.print("Sent ");
-          // Serial.println(buf);
-          pTransmit->setValue((unsigned char *)float_array, 2*sizeof(float)*NUM_FLOATS);
-          pTransmit->notify();
-
-          digitalWrite(GREEN_LED, button_high);
-          button_high = !button_high;
-
-          // waiting for reader to say they've received all the data
-          while(strcmp((const char *)pTransmit->getData(), "GOOD")) {
-            // Serial.println("WAITING UNTIL GOOD");
-            delay(5);
-          }
-
-          delay(5);  // bluetooth stack will go into congestion, if too many packets
-                    // are sent, in 6 hours test i was able to go as low as 3ms
-        }
-        pTransmit->setValue("DONE");
-        pTransmit->notify();
-        refreshDisplay("Done.");
+  if (devices_connected >= 2) {
+    /// 1. Check if switch on or off
+  if (buttonState == HIGH) {
+    Serial.println("receiving");
+    float list_of_zeros[6] = {0, 0, 0, 0, 0, 0};
+    /// 2. If switch on, wait for connection to legs and transmit
+    if (strcmp((const char*)pLeft->getData(), "START") && strcmp((const char*)pLeft->getData(), "START")){
+      // now do checking to make sure that neither are empty strings
+      if (!strcmp((const char*)pLeft->getData(), "") || !strcmp((const char*)pLeft->getData(), "")){
+        if (started)
+          refreshDisplay(">=1 knee\nsleeve not\ntransmit");
+        else
+          return;
+      }
+      if (!started) {
         digitalWrite(GREEN_LED, HIGH);
-        delay(3000);
+        delay(1000);
         digitalWrite(GREEN_LED, LOW);
-        digitalWrite(RED_LED, LOW);
+      }
+      started = true;
+      char oled_buf[100];
+      sprintf(oled_buf, "Run start\nTime: %.2f", (float)time_ms/1000);
+      refreshDisplay(oled_buf);
+      time_ms += 67;
+      // if strings are not uninitialized and not null, add them to the csv
+      float *mini_float_buffer = (float*)float_buffer + 2*NUM_FLOATS*num_samples_received;
+      char buf[100];
+      sprintf(buf, "mini_float_buffer: %p, mini_float_buffer + NUM_FLOATS*sizeof(float): %p", (const char*)mini_float_buffer, (const char*)mini_float_buffer + NUM_FLOATS*sizeof(float));
+      Serial.println(buf);
+      memcpy(mini_float_buffer, pLeft->getData(), NUM_FLOATS*sizeof(float));
+      memcpy(mini_float_buffer + NUM_FLOATS, pRight->getData(), NUM_FLOATS*sizeof(float));
+
+      char string_buffer[100]; 
+
+      sprintf(string_buffer, "%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\n",
+        mini_float_buffer[0],
+        mini_float_buffer[1],
+        mini_float_buffer[2],
+        mini_float_buffer[3],
+        mini_float_buffer[4],
+        mini_float_buffer[5],
+        mini_float_buffer[6],
+        mini_float_buffer[7],
+        mini_float_buffer[8],
+        mini_float_buffer[9],
+        mini_float_buffer[10],
+        mini_float_buffer[11]
+        );
+
+
+      appendFile(SD, fileToWrite, string_buffer);
+
+      // Serial.print("Floats received from right: ");
+      // Serial.print(last_six_floats[0]);
+      // Serial.print(", ");
+      // Serial.print(last_six_floats[1]);
+      // Serial.print(", ");
+      // Serial.print(last_six_floats[2]);
+      // Serial.print(", ");
+      // Serial.print(last_six_floats[3]);
+      // Serial.print(", ");
+      // Serial.print(last_six_floats[4]);
+      // Serial.print(", ");
+      // Serial.println(last_six_floats[5]);
+
+      num_samples_received += 1;
+    }
+  } else {
+    /// 3. If switch off, say "StrideSync off" OR wait for transmit to computer
+    if (started) {
+      // transmitting file to computer when available
+    // waiting for computer to become available
+    while (strcmp((const char*)pTransmit->getData(), "GOOD")) {
+      Serial.println("WAITING UNTIL GOOD");
+      refreshDisplay("Run stop\nTransfer\nto PC");
+      delay(500);
+      if (buttonState == HIGH && lastButtonState == LOW) {
+        // turn LED on:
         receive = !receive;
-        refreshDisplay("Run not\nstarted.");
-        pLeft->setValue("START");
-        pLeft->notify();
-        pRight->setValue("START");
-        pRight->notify();
+        digitalWrite(RED_LED, receive);
       }
     }
-    // connecting
-    if (deviceConnected && !oldDeviceConnected) {
-      // do stuff here on connecting
-      oldDeviceConnected = deviceConnected;
+    File file = SD.open(fileToWrite);
+    // NOTE: CHANGE BACK TO i++
+    Serial.println("reading /session0.txt");
+    String buf;
+    char terminator = '\n';
+    bool button_high = false;
+    while (file.available()) {
+      String string_buf = file.readStringUntil(terminator);
+      char *ptr = NULL;
+
+      char buf[string_buf.length() + 1] = {};
+
+      string_buf.toCharArray(buf, string_buf.length());
+
+      // convert bytes to float so we can read them
+      float float_array[2*NUM_FLOATS] = {};
+      byte index = 0;
+      ptr = strtok(buf, ",");
+      while(ptr != NULL)
+      {
+          float_array[index] = atof(ptr);
+          index++;
+          ptr = strtok(NULL, ",");
+      }
+      Serial.print("Sent ");
+      Serial.println(string_buf);
+      // Serial.print(float_array[0]*RAD_TO_DEG);
+      // Serial.print(", ");
+      // Serial.print(float_array[1]*RAD_TO_DEG);
+      // Serial.print(", ");
+      // Serial.print(float_array[2]*RAD_TO_DEG);
+      // Serial.print(", ");
+      // Serial.print(float_array[3]*RAD_TO_DEG);
+      // Serial.print(", ");
+      // Serial.print(float_array[4]*RAD_TO_DEG);
+      // Serial.print(", ");
+      // Serial.print(float_array[5]*RAD_TO_DEG);
+      // Serial.print(", ");
+      // Serial.print(float_array[6]*RAD_TO_DEG);
+      // Serial.print(", ");
+      // Serial.print(float_array[7]*RAD_TO_DEG);
+      // Serial.print(", ");
+      // Serial.print(float_array[8]*RAD_TO_DEG);
+      // Serial.print(", ");
+      // Serial.print(float_array[9]*RAD_TO_DEG);
+      // Serial.print(", ");
+      // Serial.print(float_array[10]*RAD_TO_DEG);
+      // Serial.print(", ");
+      // Serial.println(float_array[11]*RAD_TO_DEG);
+
+      // Serial.print("Sent ");
+      // Serial.println(buf);
+      pTransmit->setValue((unsigned char *)float_array, 2*sizeof(float)*NUM_FLOATS);
+      pTransmit->notify();
+
+      digitalWrite(GREEN_LED, button_high);
+      button_high = !button_high;
+
+      // waiting for reader to say they've received all the data
+      while(strcmp((const char *)pTransmit->getData(), "GOOD")) {
+        // Serial.println("WAITING UNTIL GOOD");
+        delay(5);
+      }
+
+      delay(5);  // bluetooth stack will go into congestion, if too many packets
+                // are sent, in 6 hours test i was able to go as low as 3ms
     }
+    pTransmit->setValue("DONE");
+    pTransmit->notify();
+    refreshDisplay("Done.");
+    digitalWrite(GREEN_LED, HIGH);
+    delay(3000);
+    digitalWrite(GREEN_LED, LOW);
+    digitalWrite(RED_LED, LOW);
+    receive = !receive;
+    refreshDisplay("Run not\nstarted.");
+    pLeft->setValue("START");
+    pLeft->notify();
+    pRight->setValue("START");
+    pRight->notify();
+    started = false;
+    } else {
+      refreshDisplay("Turn on to\nstart run");
+    }
+  }
+  } else {
+    refreshDisplay("Waiting \nfor \nconnection");
+  }
+
+  
   
   delay(67); // Delay half a second between loops.
   Serial.write(13);
