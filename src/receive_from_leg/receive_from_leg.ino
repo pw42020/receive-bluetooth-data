@@ -144,7 +144,7 @@ void refreshDisplay(char *buffer)
 void setup() {
   Serial.begin(115200);
 
-  while (!Serial);
+  // while (!Serial); // only turn on while debugging
 
   pinMode(RX, OUTPUT);
   if(!SD.begin(RX)){
@@ -414,6 +414,9 @@ void loop() {
     pRight->setValue("START");
     pRight->notify();
     started = false;
+    time_ms = 0;
+    pTransmit->setValue("");
+    writeFile(SD, fileToWrite, "");
     } else {
       refreshDisplay("Turn on to\nstart run");
     }
@@ -424,6 +427,6 @@ void loop() {
 
   
   
-  delay(67); // Delay half a second between loops.
+  delay(33); // Delay half a second between loops.
   Serial.write(13);
 } // End of loop

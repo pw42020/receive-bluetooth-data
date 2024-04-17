@@ -43,7 +43,7 @@ CHANNEL_NAME = "4BE89814-827A-7A33-0672-DE98DFF5888D"
 
 NUM_FLOATS_TRANSMITTED: Final[int] = 6
 
-SAMPLES_PER_SECOND: Final[int] = 15
+SAMPLES_PER_SECOND: Final[int] = 30
 
 RUN_FOLDER_LOCATION: Final[Path] = Path(os.path.dirname(__file__)).parent.parent
 
