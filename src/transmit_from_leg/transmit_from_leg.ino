@@ -61,7 +61,6 @@ void setup_bno055() {
 
       delay(50);
     }
-    // while(1);
   } else {
     Serial.println("GOOD!!!!");
   }
@@ -177,7 +176,7 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
 void setup() {
   Serial.begin(115200);
 
-  while (!Serial);
+  // while (!Serial);
   
   Serial.println("Starting Arduino BLE Client application...");
   BLEDevice::init("");
@@ -224,14 +223,14 @@ void loop() {
     imu::Quaternion quad_quat = bnoquad.getQuat();
     imu::Quaternion shin_quat = bnoshin.getQuat();
 
-    // Serial.println("quad orientation: ");
-    // Serial.print(quad_quat.w());
-    // Serial.print(", ");
-    // Serial.print(quad_quat.x());
-    // Serial.print(", ");
-    // Serial.print(quad_quat.y());
-    // Serial.print(", ");
-    // Serial.println(quad_quat.z());
+    Serial.println("quad orientation: ");
+    Serial.print(quad_quat.w());
+    Serial.print(", ");
+    Serial.print(quad_quat.x());
+    Serial.print(", ");
+    Serial.print(quad_quat.y());
+    Serial.print(", ");
+    Serial.println(quad_quat.z());
 
     imu::Vector<3> quad_ori = quad_quat.toEuler();
     imu::Vector<3> shin_ori = shin_quat.toEuler();

@@ -83,33 +83,33 @@ BLEClient*  pClient;
 /** All information regarding SD card write and read **/
 
 void writeFile(fs::FS &fs, const char * path, const char * message){
-    Serial.printf("Writing file: %s\n", path);
+    // Serial.printf("Writing file: %s\n", path);
 
     File file = fs.open(path, FILE_WRITE);
     if(!file){
-        Serial.println("Failed to open file for writing");
+        // Serial.println("Failed to open file for writing");
         return;
     }
     if(file.print(message)){
-        Serial.println("File written");
+        // Serial.println("File written");
     } else {
-        Serial.println("Write failed");
+        // Serial.println("Write failed");
     }
     file.close();
 }
 
 void appendFile(fs::FS &fs, const char * path, const char * message){
-    Serial.printf("Appending to file: %s\n", path);
+    // Serial.printf("Appending to file: %s\n", path);
 
     File file = fs.open(path, FILE_APPEND);
     if(!file){
-        Serial.println("Failed to open file for appending");
+        // Serial.println("Failed to open file for appending");
         return;
     }
     if(file.print(message)){
-        Serial.println("Message appended");
+        // Serial.println("Message appended");
     } else {
-        Serial.println("Append failed");
+        // Serial.println("Append failed");
     }
     file.close();
 }
@@ -126,7 +126,7 @@ void setup_oled()
 {
   // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
   if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
-    Serial.println(F("SSD1306 allocation failed"));
+    // Serial.println(F("SSD1306 allocation failed"));
     for(;;); // Don't proceed, loop forever
   }
 }
@@ -142,23 +142,23 @@ void refreshDisplay(char *buffer)
 }
 
 void setup() {
-  Serial.begin(115200);
+  // Serial.begin(115200);
 
   // while (!Serial); // only turn on while debugging
 
   pinMode(RX, OUTPUT);
   if(!SD.begin(RX)){
-      Serial.println("Card Mount Failed");
+      // Serial.println("Card Mount Failed");
       return;
   }
 
   writeFile(SD, fileToWrite, "");
 
   uint64_t cardSize = SD.cardSize() / (1024 * 1024);
-  Serial.printf("SD Card Size: %lluMB\n", cardSize);
+  // Serial.printf("SD Card Size: %lluMB\n", cardSize);
 
   // setting up BLE Application
-  Serial.println("Starting Arduino BLE Server application...");
+  // Serial.println("Starting Arduino BLE Server application...");
   BLEDevice::init("StrideSync");
 
   // setup OLED
@@ -226,14 +226,14 @@ void setup() {
   pinMode(GREEN_LED, OUTPUT);
   pinMode(RED_LED, OUTPUT);
   BLEDevice::startAdvertising();
-  Serial.println("Started advertising.");
+  // Serial.println("Started advertising.");
 } // End of setup.
 
 // This is the Arduino main loop function.
 void loop() {
   lastButtonState = buttonState;
   buttonState = digitalRead(BUTTON);
-  Serial.println(buttonState);
+  // Serial.println(buttonState);
 
   /**
   Method for the loop
@@ -254,7 +254,7 @@ void loop() {
   if (devices_connected >= 2) {
     /// 1. Check if switch on or off
   if (buttonState == HIGH) {
-    Serial.println("receiving");
+    // Serial.println("receiving");
     float list_of_zeros[6] = {0, 0, 0, 0, 0, 0};
     /// 2. If switch on, wait for connection to legs and transmit
     if (strcmp((const char*)pLeft->getData(), "START") && strcmp((const char*)pLeft->getData(), "START")){
@@ -279,7 +279,7 @@ void loop() {
       float *mini_float_buffer = (float*)float_buffer + 2*NUM_FLOATS*num_samples_received;
       char buf[100];
       sprintf(buf, "mini_float_buffer: %p, mini_float_buffer + NUM_FLOATS*sizeof(float): %p", (const char*)mini_float_buffer, (const char*)mini_float_buffer + NUM_FLOATS*sizeof(float));
-      Serial.println(buf);
+      // Serial.println(buf);
       memcpy(mini_float_buffer, pLeft->getData(), NUM_FLOATS*sizeof(float));
       memcpy(mini_float_buffer + NUM_FLOATS, pRight->getData(), NUM_FLOATS*sizeof(float));
 
@@ -324,7 +324,7 @@ void loop() {
       // transmitting file to computer when available
     // waiting for computer to become available
     while (strcmp((const char*)pTransmit->getData(), "GOOD")) {
-      Serial.println("WAITING UNTIL GOOD");
+      // Serial.println("WAITING UNTIL GOOD");
       refreshDisplay("Run stop\nTransfer\nto PC");
       delay(500);
       if (buttonState == HIGH && lastButtonState == LOW) {
@@ -335,7 +335,7 @@ void loop() {
     }
     File file = SD.open(fileToWrite);
     // NOTE: CHANGE BACK TO i++
-    Serial.println("reading /session0.txt");
+    // Serial.println("reading /session0.txt");
     String buf;
     char terminator = '\n';
     bool button_high = false;
@@ -357,8 +357,8 @@ void loop() {
           index++;
           ptr = strtok(NULL, ",");
       }
-      Serial.print("Sent ");
-      Serial.println(string_buf);
+      // Serial.print("Sent ");
+      // Serial.println(string_buf);
       // Serial.print(float_array[0]*RAD_TO_DEG);
       // Serial.print(", ");
       // Serial.print(float_array[1]*RAD_TO_DEG);
@@ -428,5 +428,5 @@ void loop() {
   
   
   delay(33); // Delay half a second between loops.
-  Serial.write(13);
+  // Serial.write(13);
 } // End of loop
