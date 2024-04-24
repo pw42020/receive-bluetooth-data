@@ -46,6 +46,7 @@ int devices_connected = 0;
 #define GREEN_LED A2
 #define BUTTON A0
 #define BUTTON_STAY A1
+#define DELAY_BETWEEN 67
 
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
 // The pins for I2C are defined by the Wire-library. 
@@ -57,6 +58,7 @@ int devices_connected = 0;
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 static BLEUUID serviceUUID(SERVICE_UUID);
+// int iteration = 0;
 // The characteristic of the remote service we are interested in.
 
 static boolean doConnect = false;
@@ -73,10 +75,12 @@ bool started = false;
 char * fileToWrite = "/session0.txt";
 
 int64_t time_ms = 0;
+int64_t last_time_display = -1000;
+int64_t last_time_ms = -DELAY_BETWEEN;
+int64_t init_time_ms = -1;
+
 
 int MAX_FLOATS = 2*NUM_FLOATS*SECONDS_IN_MINUTE*MAX_NUM_MINUTES*SAMPLES_PER_SECOND;
-float float_buffer[2*NUM_FLOATS*SECONDS_IN_MINUTE*MAX_NUM_MINUTES*SAMPLES_PER_SECOND];
-int64_t num_samples_received = 0;
 
 BLEClient*  pClient;
 
@@ -96,6 +100,15 @@ void writeFile(fs::FS &fs, const char * path, const char * message){
         // Serial.println("Write failed");
     }
     file.close();
+}
+
+void deleteFile(fs::FS &fs, const char * path){
+    Serial.printf("Deleting file: %s\n", path);
+    if(fs.remove(path)){
+        Serial.println("File deleted");
+    } else {
+        Serial.println("Delete failed");
+    }
 }
 
 void appendFile(fs::FS &fs, const char * path, const char * message){
@@ -142,7 +155,7 @@ void refreshDisplay(char *buffer)
 }
 
 void setup() {
-  // Serial.begin(115200);
+  Serial.begin(115200);
 
   // while (!Serial); // only turn on while debugging
 
@@ -254,8 +267,6 @@ void loop() {
   if (devices_connected >= 2) {
     /// 1. Check if switch on or off
   if (buttonState == HIGH) {
-    // Serial.println("receiving");
-    float list_of_zeros[6] = {0, 0, 0, 0, 0, 0};
     /// 2. If switch on, wait for connection to legs and transmit
     if (strcmp((const char*)pLeft->getData(), "START") && strcmp((const char*)pLeft->getData(), "START")){
       // now do checking to make sure that neither are empty strings
@@ -266,57 +277,53 @@ void loop() {
           return;
       }
       if (!started) {
+        init_time_ms = millis();
         digitalWrite(GREEN_LED, HIGH);
         delay(1000);
         digitalWrite(GREEN_LED, LOW);
       }
       started = true;
       char oled_buf[100];
-      sprintf(oled_buf, "Run start\nTime: %.2f", (float)time_ms/1000);
-      refreshDisplay(oled_buf);
-      time_ms += 67;
-      // if strings are not uninitialized and not null, add them to the csv
-      float *mini_float_buffer = (float*)float_buffer + 2*NUM_FLOATS*num_samples_received;
-      char buf[100];
-      sprintf(buf, "mini_float_buffer: %p, mini_float_buffer + NUM_FLOATS*sizeof(float): %p", (const char*)mini_float_buffer, (const char*)mini_float_buffer + NUM_FLOATS*sizeof(float));
-      // Serial.println(buf);
-      memcpy(mini_float_buffer, pLeft->getData(), NUM_FLOATS*sizeof(float));
-      memcpy(mini_float_buffer + NUM_FLOATS, pRight->getData(), NUM_FLOATS*sizeof(float));
+      sprintf(oled_buf, "Run start\nTime: %.1f", (float)time_ms/1000);
+      if (time_ms - last_time_display > 500) {
+        last_time_display = time_ms;
+        refreshDisplay(oled_buf);
+      }
+      time_ms = millis() - init_time_ms;
+      if (time_ms - last_time_ms >= DELAY_BETWEEN) {
+        Serial.print("Time between time_ms and last_time_ms: ");
+        Serial.println(time_ms - last_time_ms);
+        last_time_ms = time_ms;
+        // Serial.println(iteration);
+        // iteration++;
+        // if strings are not uninitialized and not null, add them to the csv
+        float mini_float_buffer[2*NUM_FLOATS];
+        memcpy(mini_float_buffer, pLeft->getData(), NUM_FLOATS*sizeof(float));
+        memcpy(mini_float_buffer + NUM_FLOATS, pRight->getData(), NUM_FLOATS*sizeof(float));
+        Serial.println("Done A");
 
-      char string_buffer[100]; 
-
-      sprintf(string_buffer, "%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\n",
-        mini_float_buffer[0],
-        mini_float_buffer[1],
-        mini_float_buffer[2],
-        mini_float_buffer[3],
-        mini_float_buffer[4],
-        mini_float_buffer[5],
-        mini_float_buffer[6],
-        mini_float_buffer[7],
-        mini_float_buffer[8],
-        mini_float_buffer[9],
-        mini_float_buffer[10],
-        mini_float_buffer[11]
-        );
-
-
-      appendFile(SD, fileToWrite, string_buffer);
-
-      // Serial.print("Floats received from right: ");
-      // Serial.print(last_six_floats[0]);
-      // Serial.print(", ");
-      // Serial.print(last_six_floats[1]);
-      // Serial.print(", ");
-      // Serial.print(last_six_floats[2]);
-      // Serial.print(", ");
-      // Serial.print(last_six_floats[3]);
-      // Serial.print(", ");
-      // Serial.print(last_six_floats[4]);
-      // Serial.print(", ");
-      // Serial.println(last_six_floats[5]);
-
-      num_samples_received += 1;
+        char string_buffer[100]; 
+        Serial.println("Done B");
+        sprintf(string_buffer, "%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\n",
+          mini_float_buffer[0],
+          mini_float_buffer[1],
+          mini_float_buffer[2],
+          mini_float_buffer[3],
+          mini_float_buffer[4],
+          mini_float_buffer[5],
+          mini_float_buffer[6],
+          mini_float_buffer[7],
+          mini_float_buffer[8],
+          mini_float_buffer[9],
+          mini_float_buffer[10],
+          mini_float_buffer[11]
+          );
+        Serial.println("Done C");
+        appendFile(SD, fileToWrite, string_buffer);
+        Serial.println("Done D");
+      }
+      else
+        return;
     }
   } else {
     /// 3. If switch off, say "StrideSync off" OR wait for transmit to computer
@@ -340,20 +347,36 @@ void loop() {
     char terminator = '\n';
     bool button_high = false;
     while (file.available()) {
-      String string_buf = file.readStringUntil(terminator);
+      String string_buf_first_line = file.readStringUntil(terminator);
+      String string_buf_second_line = "";
+      if (file.available()) {
+        string_buf_second_line = file.readStringUntil(terminator);
+      }
       char *ptr = NULL;
 
-      char buf[string_buf.length() + 1] = {};
+      char buf[string_buf_first_line.length() + 1] = {};
 
-      string_buf.toCharArray(buf, string_buf.length());
+      string_buf_first_line.toCharArray(buf, string_buf_first_line.length());
 
       // convert bytes to float so we can read them
-      float float_array[2*NUM_FLOATS] = {};
+      float float_array[4*NUM_FLOATS] = {};
       byte index = 0;
       ptr = strtok(buf, ",");
       while(ptr != NULL)
       {
           float_array[index] = atof(ptr);
+          index++;
+          ptr = strtok(NULL, ",");
+      }
+
+      string_buf_second_line.toCharArray(buf, string_buf_second_line.length());
+
+      // convert bytes to float so we can read them
+      index = 0;
+      ptr = strtok(buf, ",");
+      while(ptr != NULL)
+      {
+          float_array[2*NUM_FLOATS + index] = atof(ptr);
           index++;
           ptr = strtok(NULL, ",");
       }
@@ -385,7 +408,7 @@ void loop() {
 
       // Serial.print("Sent ");
       // Serial.println(buf);
-      pTransmit->setValue((unsigned char *)float_array, 2*sizeof(float)*NUM_FLOATS);
+      pTransmit->setValue((unsigned char *)float_array, 4*sizeof(float)*NUM_FLOATS);
       pTransmit->notify();
 
       digitalWrite(GREEN_LED, button_high);
@@ -416,6 +439,7 @@ void loop() {
     started = false;
     time_ms = 0;
     pTransmit->setValue("");
+    deleteFile(SD, fileToWrite);
     writeFile(SD, fileToWrite, "");
     } else {
       refreshDisplay("Turn on to\nstart run");
@@ -424,9 +448,6 @@ void loop() {
   } else {
     refreshDisplay("Waiting \nfor \nconnection");
   }
-
-  
-  
-  delay(33); // Delay half a second between loops.
+  delay(1); // Delay
   // Serial.write(13);
 } // End of loop

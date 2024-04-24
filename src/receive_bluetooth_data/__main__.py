@@ -101,6 +101,7 @@ async def main(address) -> None:
 
     start = time.time()
     async with BleakClient(chosen_device.address) as client:
+        await client.connect()
         # read data from bluetooth
         # read all of client's characteristics
         log.info("Connected: %s", client.is_connected)
@@ -120,41 +121,26 @@ async def main(address) -> None:
                 )
             )
             while True:
+                start_time: float = time.time()
                 leg_response: Final[bytearray] = await client.read_gatt_char(LEG_ID)
                 try:
-                    if leg_response.decode() == "GOOD":
-                        continue
-                except Exception as e:
-                    # log.error("Error: %s", e)
-                    pass
-
-                try:
-                    if leg_response.decode() != "DONE" or leg_response.decode() == "":
-                        await client.write_gatt_char(LEG_ID, b"GOOD")
-                        continue
-                except Exception as e:
-                    # log.error("Error: %s", e)
-                    pass
-
-                # add data to file
-                try:
-                    if leg_response.decode() != "DONE":
-                        float_list = struct.unpack("%sf" % 12, bytearray(leg_response))
-                        file_lines.append(",".join(str(e) for e in float_list) + "\n")
-                        await client.write_gatt_char(LEG_ID, b"GOOD")
-                    else:
-                        log.info("DONE")
+                    decoded_leg_response = leg_response.decode()
+                    if decoded_leg_response == "DONE":
                         break
-                    # time.sleep(0.005)
-                except Exception as e:
-                    print("receiving...")
-                    float_list = struct.unpack("%sf" % 12, bytearray(leg_response))
-                    # print(float_list)
-                    file_lines.append(",".join(str(e) for e in float_list) + "\n")
-                    await client.write_gatt_char(LEG_ID, b"GOOD")
+                    if decoded_leg_response == "GOOD":
+                        continue
 
+                    if decoded_leg_response == "":
+                        await client.write_gatt_char(LEG_ID, b"GOOD")
+                except Exception as e:
+                    float_list = struct.unpack("%sf" % 2*12, bytearray(leg_response))
+                    file_lines.extend([",".join(str(e) for e in float_list[i*12:(i+1)*12]) + "\n" for i in range(2)])
+                    await client.write_gatt_char(LEG_ID, b"GOOD")
+                
                 # give time for program to send more packets
                 # time.sleep(round(1 / SAMPLES_PER_SECOND))
+                finish_time: float = time.time()
+                print("took %s" % (finish_time - start_time))
         finally:
             # closing the file when the program is complete or an error occurs
             file.writelines(file_lines)
